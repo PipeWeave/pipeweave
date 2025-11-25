@@ -14,13 +14,13 @@
 
 ## Packages
 
-| Package | Description |
-| ------- | ----------- |
-| [`@pipeweave/sdk`](./sdks/nodejs) | Worker SDK for Node.js — [docs](./sdks/nodejs/README.md) |
+| Package                                              | Description                                                       |
+| ---------------------------------------------------- | ----------------------------------------------------------------- |
+| [`@pipeweave/sdk`](./sdks/nodejs)                    | Worker SDK for Node.js — [docs](./sdks/nodejs/README.md)          |
 | [`@pipeweave/orchestrator`](./packages/orchestrator) | Task execution engine — [docs](./packages/orchestrator/README.md) |
-| [`@pipeweave/cli`](./packages/cli) | Command line interface — [docs](./packages/cli/README.md) |
-| [`@pipeweave/ui`](./packages/ui) | Web monitoring dashboard — [docs](./packages/ui/README.md) |
-| [`@pipeweave/shared`](./packages/shared) | Shared types and utilities — [docs](./packages/shared/README.md) |
+| [`@pipeweave/cli`](./packages/cli)                   | Command line interface — [docs](./packages/cli/README.md)         |
+| [`@pipeweave/ui`](./packages/ui)                     | Web monitoring dashboard — [docs](./packages/ui/README.md)        |
+| [`@pipeweave/shared`](./packages/shared)             | Shared types and utilities — [docs](./packages/shared/README.md)  |
 
 ## Quick Start
 
@@ -133,14 +133,14 @@ graph TB
     DB[("PostgreSQL<br/>metadata")]
     S3[("S3/MinIO<br/>task data")]
 
-    Worker -->|"1. Register tasks"| Orch
-    Orch -->|"2. Task execution requests"| Worker
-    CLI -->|"3. Trigger pipelines<br/>4. Query status"| Orch
-    UI -->|"5. Fetch runs & stats"| Orch
+    Worker -->|"Register tasks"| Orch
+    Orch -->|"Task execution requests"| Worker
+    CLI -->|"Trigger pipelines<br/>Query status"| Orch
+    UI -->|"Fetch runs & stats"| Orch
 
-    Orch -.->|"6. Store metadata"| DB
-    Orch -.->|"7. Store task I/O"| S3
-    Worker -.->|"8. Direct access"| S3
+    Orch -.->|"Store metadata"| DB
+    Orch -.->|"Store task I/O"| S3
+    Worker -.->|"Direct access"| S3
 ```
 
 **Data Flow:**
@@ -255,6 +255,7 @@ openssl rand -hex 32
 ```
 
 **Required variables:**
+
 - `DATABASE_URL` — PostgreSQL connection string
 - `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY`, `S3_SECRET_KEY` — S3/MinIO credentials
 - `PIPEWEAVE_SECRET_KEY` — Shared encryption key (must be same on orchestrator and all workers)
