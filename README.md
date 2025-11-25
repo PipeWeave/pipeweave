@@ -1,4 +1,4 @@
-# pipeweave# PipeWeave
+# PipeWeave
 
 **A lightweight, debuggable task orchestration framework for serverless architectures**
 
@@ -15,12 +15,12 @@
 ## Packages
 
 | Package | Description |
-|---------|-------------|
-| [`@pipeweave/sdk`](./sdks/nodejs) | Worker SDK for Node.js |
-| [`@pipeweave/orchestrator`](./packages/orchestrator) | Task execution engine |
-| [`@pipeweave/cli`](./packages/cli) | Command line interface |
-| [`@pipeweave/ui`](./packages/ui) | Web monitoring dashboard |
-| [`@pipeweave/shared`](./packages/shared) | Shared types and utilities |
+| ------- | ----------- |
+| [`@pipeweave/sdk`](./sdks/nodejs) | Worker SDK for Node.js — [docs](./sdks/nodejs/README.md) |
+| [`@pipeweave/orchestrator`](./packages/orchestrator) | Task execution engine — [docs](./packages/orchestrator/README.md) |
+| [`@pipeweave/cli`](./packages/cli) | Command line interface — [docs](./packages/cli/README.md) |
+| [`@pipeweave/ui`](./packages/ui) | Web monitoring dashboard — [docs](./packages/ui/README.md) |
+| [`@pipeweave/shared`](./packages/shared) | Shared types and utilities — [docs](./packages/shared/README.md) |
 
 ## Quick Start
 
@@ -33,38 +33,46 @@ npm install @pipeweave/sdk
 ### Define Tasks
 
 ```typescript
-import { createWorker, TaskResult } from '@pipeweave/sdk';
+import { createWorker, TaskResult } from "@pipeweave/sdk";
 
 const worker = createWorker({
-  orchestratorUrl: 'http://localhost:3000',
-  serviceId: 'my-service',
+  orchestratorUrl: "http://localhost:3000",
+  serviceId: "my-service",
   secretKey: process.env.PIPEWEAVE_SECRET_KEY!,
 });
 
 // Simple task
-worker.register('process', async (ctx) => {
+worker.register("process", async (ctx) => {
   const { data } = ctx.input;
   return { processed: true, result: data.toUpperCase() };
 });
 
 // Task with programmatic next selection
-worker.register('router', {
-  allowedNext: ['path-a', 'path-b'],
-}, async (ctx): Promise<TaskResult> => {
-  if (ctx.input.fast) {
-    return { output: { routed: true }, runNext: ['path-a'] };
+worker.register(
+  "router",
+  {
+    allowedNext: ["path-a", "path-b"],
+  },
+  async (ctx): Promise<TaskResult> => {
+    if (ctx.input.fast) {
+      return { output: { routed: true }, runNext: ["path-a"] };
+    }
+    return { output: { routed: true }, runNext: ["path-b"] };
   }
-  return { output: { routed: true }, runNext: ['path-b'] };
-});
+);
 
 // Idempotent task
-worker.register('payment', {
-  idempotencyKey: (input, codeVersion) => `v${codeVersion}-${input.orderId}`,
-  retries: 3,
-}, async (ctx) => {
-  ctx.log.info(`Processing payment v${ctx.codeVersion}`);
-  return { success: true };
-});
+worker.register(
+  "payment",
+  {
+    idempotencyKey: (input, codeVersion) => `v${codeVersion}-${input.orderId}`,
+    retries: 3,
+  },
+  async (ctx) => {
+    ctx.log.info(`Processing payment v${ctx.codeVersion}`);
+    return { success: true };
+  }
+);
 
 worker.listen(8080);
 ```
@@ -72,10 +80,10 @@ worker.listen(8080);
 ### Local Testing
 
 ```typescript
-import { runLocal } from '@pipeweave/sdk';
+import { runLocal } from "@pipeweave/sdk";
 
-const result = await runLocal(worker, 'process', {
-  input: { data: 'hello' },
+const result = await runLocal(worker, "process", {
+  input: { data: "hello" },
 });
 
 console.log(result.output); // { processed: true, result: 'HELLO' }
@@ -144,6 +152,10 @@ npm run lint
 # Format code
 npm run format
 ```
+
+## Architecture
+
+For detailed architecture, API reference, and complete specification, see [SPEC.md](./SPEC.md).
 
 ## Documentation
 
