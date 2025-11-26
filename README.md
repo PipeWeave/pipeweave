@@ -77,6 +77,67 @@ worker.register(
 worker.listen(8080);
 ```
 
+### Define Orchestrator
+
+```typescript
+import { createOrchestrator } from "@pipeweave/orchestrator";
+
+const orchestrator = createOrchestrator({
+  databaseUrl: "postgresql://localhost:5432/pipeweave",
+  storageBackends: [
+    // Local filesystem (for development)
+    {
+      id: "local-dev",
+      provider: "local",
+      endpoint: "file://",
+      bucket: "data",
+      credentials: { basePath: "./storage" },
+      isDefault: true,
+    },
+    // AWS S3 (for production)
+    // {
+    //   id: "primary-s3",
+    //   provider: "aws-s3",
+    //   endpoint: "https://s3.amazonaws.com",
+    //   bucket: "pipeweave-prod",
+    //   region: "us-east-1",
+    //   credentials: {
+    //     accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+    //     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+    //   },
+    // },
+    // Google Cloud Storage
+    // {
+    //   id: "gcs-backup",
+    //   provider: "gcs",
+    //   endpoint: "https://storage.googleapis.com",
+    //   bucket: "pipeweave-backup",
+    //   credentials: {
+    //     projectId: process.env.GCP_PROJECT_ID!,
+    //     clientEmail: process.env.GCP_CLIENT_EMAIL!,
+    //     privateKey: process.env.GCP_PRIVATE_KEY!,
+    //   },
+    // },
+    // MinIO (self-hosted S3-compatible)
+    // {
+    //   id: "local-minio",
+    //   provider: "minio",
+    //   endpoint: "http://localhost:9000",
+    //   bucket: "pipeweave-dev",
+    //   credentials: {
+    //     accessKey: "minioadmin",
+    //     secretKey: "minioadmin",
+    //   },
+    // },
+  ],
+  secretKey: process.env.PIPEWEAVE_SECRET_KEY!,
+  mode: "standalone",
+  port: 3000,
+});
+
+await orchestrator.start();
+```
+
 ### Local Testing
 
 ```typescript
