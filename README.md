@@ -1,6 +1,20 @@
-# PipeWeave
+```
+╔════════════════════════════════════════════════════════════════════════╗
+║                                                                        ║
+║ ██████╗ ██╗██████╗ ███████╗██╗    ██╗███████╗ █████╗ ██╗   ██╗███████╗ ║
+║ ██╔══██╗██║██╔══██╗██╔════╝██║    ██║██╔════╝██╔══██╗██║   ██║██╔════╝ ║
+║ ██████╔╝██║██████╔╝█████╗  ██║ █╗ ██║█████╗  ███████║██║   ██║█████╗   ║
+║ ██╔═══╝ ██║██╔═══╝ ██╔══╝  ██║███╗██║██╔══╝  ██╔══██║╚██╗ ██╔╝██╔══╝   ║
+║ ██║     ██║██║     ███████╗╚███╔███╔╝███████╗██║  ██║ ╚████╔╝ ███████╗ ║
+║ ╚═╝     ╚═╝╚═╝     ╚══════╝ ╚══╝╚══╝ ╚══════╝╚═╝  ╚═╝  ╚═══╝  ╚══════╝ ║
+║                                                                        ║
+║              Task Orchestration & Pipeline Management                  ║
+╚════════════════════════════════════════════════════════════════════════╝
+```
 
 **A lightweight, debuggable task orchestration framework for serverless architectures**
+
+Maintained by [Saritra GmbH](https://saritra.com) • Used in Production at [FirmIQ](https://firmiq.com)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -87,14 +101,16 @@ import { createOrchestrator } from "@pipeweave/orchestrator";
 
 const orchestrator = createOrchestrator({
   databaseUrl: "postgresql://localhost:5432/pipeweave",
-  storageBackends: [{
-    id: "local-dev",
-    provider: "local",
-    endpoint: "file://",
-    bucket: "data",
-    credentials: { basePath: "./storage" },
-    isDefault: true,
-  }],
+  storageBackends: [
+    {
+      id: "local-dev",
+      provider: "local",
+      endpoint: "file://",
+      bucket: "data",
+      credentials: { basePath: "./storage" },
+      isDefault: true,
+    },
+  ],
   secretKey: process.env.PIPEWEAVE_SECRET_KEY!,
   mode: "standalone",
   port: 3000,
@@ -184,13 +200,13 @@ worker.register("summarize", async (ctx) => {
 
 ## Packages
 
-| Package | Description |
-|---------|-------------|
-| [@pipeweave/sdk](./sdks/nodejs) | Worker SDK for Node.js |
-| [@pipeweave/orchestrator](./packages/orchestrator) | Task execution engine |
-| [@pipeweave/cli](./packages/cli) | Command line interface |
-| [@pipeweave/ui](./packages/ui) | Web monitoring dashboard |
-| [@pipeweave/shared](./packages/shared) | Shared types and utilities |
+| Package                                            | Description                |
+| -------------------------------------------------- | -------------------------- |
+| [@pipeweave/sdk](./sdks/nodejs)                    | Worker SDK for Node.js     |
+| [@pipeweave/orchestrator](./packages/orchestrator) | Task execution engine      |
+| [@pipeweave/cli](./packages/cli)                   | Command line interface     |
+| [@pipeweave/ui](./packages/ui)                     | Web monitoring dashboard   |
+| [@pipeweave/shared](./packages/shared)             | Shared types and utilities |
 
 ## Features
 
@@ -321,15 +337,11 @@ worker.register(
 );
 
 // 3. Track completion (join task—waits for both 2a and 2b)
-worker.register(
-  "track-completion",
-  { allowedNext: [] },
-  async (ctx) => {
-    const { userId } = ctx.upstream["create-account"].output;
-    await analytics.track(userId, "onboarding_completed");
-    return { completed: true };
-  }
-);
+worker.register("track-completion", { allowedNext: [] }, async (ctx) => {
+  const { userId } = ctx.upstream["create-account"].output;
+  await analytics.track(userId, "onboarding_completed");
+  return { completed: true };
+});
 ```
 
 See more examples in the [Examples Guide](./docs/examples.md).
@@ -369,14 +381,16 @@ import { createOrchestrator } from "@pipeweave/orchestrator";
 
 const orchestrator = createOrchestrator({
   databaseUrl: process.env.DATABASE_URL!,
-  storageBackends: [{
-    id: "local-dev",
-    provider: "local",
-    endpoint: "file://",
-    bucket: "data",
-    credentials: { basePath: "./storage" },
-    isDefault: true,
-  }],
+  storageBackends: [
+    {
+      id: "local-dev",
+      provider: "local",
+      endpoint: "file://",
+      bucket: "data",
+      credentials: { basePath: "./storage" },
+      isDefault: true,
+    },
+  ],
   secretKey: process.env.PIPEWEAVE_SECRET_KEY!,
   mode: "standalone",
   port: 3000,
