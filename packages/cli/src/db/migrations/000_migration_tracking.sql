@@ -15,8 +15,8 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
   execution_time_ms INTEGER
 );
 
-CREATE INDEX idx_schema_migrations_version ON schema_migrations(version);
-CREATE INDEX idx_schema_migrations_applied_at ON schema_migrations(applied_at DESC);
+CREATE INDEX IF NOT EXISTS idx_schema_migrations_version ON schema_migrations(version);
+CREATE INDEX IF NOT EXISTS idx_schema_migrations_applied_at ON schema_migrations(applied_at DESC);
 
 -- ============================================================================
 -- Orchestrator State Table (for maintenance mode)
@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS orchestrator_state (
 INSERT INTO orchestrator_state (id, mode) VALUES ('singleton', 'running')
 ON CONFLICT (id) DO NOTHING;
 
-CREATE INDEX idx_orchestrator_state_mode ON orchestrator_state(mode);
+CREATE INDEX IF NOT EXISTS idx_orchestrator_state_mode ON orchestrator_state(mode);
 
 -- Trigger to update timestamp
 CREATE OR REPLACE FUNCTION update_orchestrator_state_timestamp()
@@ -50,5 +50,6 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
+DROP TRIGGER IF EXISTS update_orchestrator_state_updated_at ON orchestrator_state;
 CREATE TRIGGER update_orchestrator_state_updated_at BEFORE UPDATE ON orchestrator_state
   FOR EACH ROW EXECUTE FUNCTION update_orchestrator_state_timestamp();

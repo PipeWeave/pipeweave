@@ -1,11 +1,11 @@
-import type { Express } from 'express';
+import type { Application } from 'express';
 import type { OrchestratorRequest } from '../types/internal.js';
 
 // ============================================================================
 // Health & Info Routes
 // ============================================================================
 
-export function registerHealthRoutes(app: Express): void {
+export function registerHealthRoutes(app: Application): void {
   /**
    * GET /health
    * Health check + maintenance status

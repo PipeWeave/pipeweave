@@ -267,7 +267,7 @@ export async function getMaintenanceStatus(db: Database): Promise<MaintenanceSta
 
 /**
  * Auto-transition to maintenance if waiting and all tasks complete
- * Should be called periodically by the orchestrator
+ * Called after task status changes (event-driven)
  */
 export async function checkMaintenanceTransition(db: Database): Promise<boolean> {
   const state = await getOrchestratorState(db);
@@ -285,4 +285,20 @@ export async function checkMaintenanceTransition(db: Database): Promise<boolean>
   }
 
   return false;
+}
+
+/**
+ * Hook to call after task status changes
+ * Checks if maintenance mode transition is needed
+ * This is event-driven and doesn't require polling
+ */
+export async function onTaskStatusChange(db: Database): Promise<void> {
+  try {
+    const transitioned = await checkMaintenanceTransition(db);
+    if (transitioned) {
+      logger.info('[maintenance] Auto-transitioned to maintenance mode (event-driven)');
+    }
+  } catch (error) {
+    logger.error('[maintenance] Error in onTaskStatusChange hook', { error });
+  }
 }

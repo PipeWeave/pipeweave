@@ -77,6 +77,7 @@ const orchestrator = createOrchestrator({
   mode: "standalone",
   maxConcurrency: 10,
   pollIntervalMs: 1000,
+  logLevel: "normal", // Options: 'minimal' | 'normal' | 'detailed'
 });
 
 await orchestrator.start();
@@ -97,6 +98,36 @@ await orchestrator.start();
 // POST http://your-orchestrator/api/tick
 ```
 
+## Configuration
+
+### Log Levels
+
+The orchestrator supports three logging levels to control verbosity:
+
+- **`minimal`** — Only critical events (startup, shutdown, errors, maintenance transitions)
+- **`normal`** (default) — Important events including tick completions with task counts, database connections, backend summaries
+- **`detailed`** — All events including HTTP requests, maintenance checker activity, detailed storage backend info
+
+Example:
+```typescript
+const orchestrator = createOrchestrator({
+  // ... other config ...
+  logLevel: "detailed", // Show all logs
+});
+```
+
+### Tick Logging
+
+When the `/api/tick` endpoint is called (serverless mode), the orchestrator logs:
+- **Detailed mode**: Tick start and completion with task count and duration
+- **Normal mode**: Tick completion with task count and duration
+- **Minimal mode**: Only errors and maintenance mode skips
+
+Example log output:
+```
+[orchestrator] Tick completed - processed: 15 tasks in 234ms
+```
+
 ## Environment Variables
 
 | Variable                     | Required | Default      | Description                                   |
@@ -111,6 +142,7 @@ await orchestrator.start();
 | `DLQ_RETENTION_DAYS`         | No       | `30`         | How long to keep DLQ entries                  |
 | `IDEMPOTENCY_TTL_SECONDS`    | No       | `86400`      | Default idempotency cache TTL                 |
 | `MAX_RETRY_DELAY_MS`         | No       | `86400000`   | Default max retry delay (24h)                 |
+| `LOG_LEVEL`                  | No       | `normal`     | Logging verbosity (`minimal`, `normal`, `detailed`) |
 
 ## Folder Structure
 

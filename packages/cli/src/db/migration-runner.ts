@@ -165,11 +165,16 @@ async function applyMigration(db: Database, migration: Migration): Promise<void>
 /**
  * Run all pending migrations
  */
-export async function runMigrations(db: Database): Promise<{
+export async function runMigrations(db: Database, options?: {
+  force?: boolean; // Force re-run migrations even if checksum differs
+}): Promise<{
   applied: number;
   skipped: number;
+  errors: string[];
 }> {
   console.log('[migrations] Checking migration status...\n');
+
+  const errors: string[] = [];
 
   // Discover all migrations
   const allMigrations = discoverMigrations();
@@ -181,8 +186,15 @@ export async function runMigrations(db: Database): Promise<{
     const trackingMigration = allMigrations.find((m) => m.version === '000');
     if (trackingMigration) {
       console.log('[migrations] Initializing migration tracking...\n');
-      await db.none(trackingMigration.sql);
-      console.log('[migrations] ✓ Migration tracking initialized\n');
+      try {
+        await db.none(trackingMigration.sql);
+        console.log('[migrations] ✓ Migration tracking initialized\n');
+      } catch (error: any) {
+        // If the tracking table already exists but we couldn't detect it,
+        // this is likely fine - just log and continue
+        console.warn('[migrations] ⚠ Warning during tracking initialization:', error.message);
+        console.log('[migrations] Continuing with migrations...\n');
+      }
     } else {
       throw new Error('Migration tracking file (000_migration_tracking.sql) not found');
     }
@@ -193,7 +205,7 @@ export async function runMigrations(db: Database): Promise<{
 
   if (status.pending.length === 0) {
     console.log('[migrations] ✓ All migrations up to date');
-    return { applied: 0, skipped: status.applied.length };
+    return { applied: 0, skipped: status.applied.length, errors: [] };
   }
 
   console.log(`[migrations] Current version: ${status.current || 'none'}`);
@@ -203,26 +215,126 @@ export async function runMigrations(db: Database): Promise<{
   for (const applied of status.applied) {
     const migration = allMigrations.find((m) => m.version === applied.version);
     if (migration && migration.checksum !== applied.checksum) {
-      throw new Error(
-        `Migration ${applied.version} has been modified (checksum mismatch). ` +
-        `This is dangerous and not supported.`
-      );
+      const warningMsg = `Migration ${applied.version} has been modified (checksum mismatch).`;
+      if (options?.force) {
+        console.warn(`[migrations] ⚠ WARNING: ${warningMsg} Force mode enabled, continuing...`);
+        errors.push(warningMsg);
+      } else {
+        throw new Error(
+          `${warningMsg} This is dangerous and not supported. Use --force to override.`
+        );
+      }
     }
   }
 
   // Apply pending migrations in order
   let appliedCount = 0;
   for (const migration of status.pending) {
-    await applyMigration(db, migration);
-    appliedCount++;
+    try {
+      await applyMigration(db, migration);
+      appliedCount++;
+    } catch (error: any) {
+      const errorMsg = `Failed to apply migration ${migration.version}_${migration.name}: ${error.message}`;
+      console.error(`[migrations] ✗ ${errorMsg}`);
+      errors.push(errorMsg);
+
+      // Continue with remaining migrations instead of failing completely
+      console.log('[migrations] Continuing with remaining migrations...\n');
+    }
   }
 
-  console.log(`\n[migrations] ✓ Applied ${appliedCount} migration(s)`);
+  if (appliedCount > 0) {
+    console.log(`\n[migrations] ✓ Applied ${appliedCount} migration(s)`);
+  }
+
+  if (errors.length > 0) {
+    console.log(`\n[migrations] ⚠ Completed with ${errors.length} error(s)`);
+  }
 
   return {
     applied: appliedCount,
     skipped: status.applied.length,
+    errors,
   };
+}
+
+/**
+ * Ensure database schema is fully up to date by re-running all migrations idempotently
+ * This is useful for fixing partially applied migrations or ensuring consistency
+ */
+export async function ensureSchemaUpToDate(db: Database): Promise<{
+  reapplied: number;
+  errors: string[];
+}> {
+  console.log('[migrations] Ensuring schema is fully up to date...\n');
+
+  const errors: string[] = [];
+  let reapplied = 0;
+
+  // Get all migrations
+  const allMigrations = discoverMigrations();
+
+  // Ensure tracking table exists
+  const trackingInitialized = await isMigrationTrackingInitialized(db);
+  if (!trackingInitialized) {
+    const trackingMigration = allMigrations.find((m) => m.version === '000');
+    if (trackingMigration) {
+      console.log('[migrations] Initializing migration tracking...\n');
+      try {
+        await db.none(trackingMigration.sql);
+        console.log('[migrations] ✓ Migration tracking initialized\n');
+        reapplied++;
+      } catch (error: any) {
+        console.warn('[migrations] ⚠ Warning during tracking initialization:', error.message);
+        errors.push(`Tracking initialization: ${error.message}`);
+      }
+    }
+  }
+
+  // Get already applied migrations
+  const appliedMigrations = await getAppliedMigrations(db);
+  const appliedVersions = new Set(appliedMigrations.map((m) => m.version));
+
+  // Re-run all migrations idempotently (they should use IF NOT EXISTS)
+  for (const migration of allMigrations) {
+    // Skip migration 000 if already run above
+    if (migration.version === '000' && !trackingInitialized && reapplied > 0) {
+      continue;
+    }
+
+    console.log(`[migrations] Re-applying ${migration.version}_${migration.name} (idempotent)...`);
+
+    try {
+      // Execute the migration SQL (should be idempotent)
+      await db.none(migration.sql);
+
+      // Record in tracking if not already there
+      if (!appliedVersions.has(migration.version)) {
+        await db.none(
+          `INSERT INTO schema_migrations (version, name, checksum, execution_time_ms)
+           VALUES ($1, $2, $3, $4)
+           ON CONFLICT (version) DO UPDATE SET
+             checksum = EXCLUDED.checksum,
+             applied_at = NOW()`,
+          [migration.version, migration.name, migration.checksum, 0]
+        );
+        reapplied++;
+      }
+
+      console.log(`[migrations] ✓ Re-applied ${migration.version}_${migration.name}`);
+    } catch (error: any) {
+      // Log error but continue - some statements might fail if already applied
+      const errorMsg = `${migration.version}_${migration.name}: ${error.message}`;
+      console.warn(`[migrations] ⚠ ${errorMsg}`);
+      errors.push(errorMsg);
+    }
+  }
+
+  console.log(`\n[migrations] ✓ Schema update complete`);
+  console.log(`  • Re-applied: ${reapplied}`);
+  console.log(`  • Warnings: ${errors.length}`);
+
+  return { reapplied, errors };
 }
 
 /**

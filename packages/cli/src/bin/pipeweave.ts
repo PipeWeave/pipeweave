@@ -14,6 +14,7 @@ import {
   runMigrations,
   getMigrationStatus,
   validateMigrations,
+  ensureSchemaUpToDate,
 } from '../db/migration-runner.js';
 import {
   getMaintenanceStatus,
@@ -33,6 +34,7 @@ import {
   listConnections,
   getConfigPath,
 } from '../config/connections.js';
+import { runSetup } from '../commands/setup.js';
 
 // ============================================================================
 // ASCII Art Logo
@@ -96,6 +98,23 @@ function createDatabaseFromOptions(options: any) {
     return createDatabaseFromEnv();
   }
 }
+
+// ============================================================================
+// setup command
+// ============================================================================
+
+program
+  .command('setup')
+  .description('Complete setup wizard for PipeWeave (database, user, secret)')
+  .action(async () => {
+    try {
+      const result = await runSetup();
+      process.exit(result.success ? 0 : 1);
+    } catch (error) {
+      console.error(chalk.red('\n✗ Setup failed:'), error);
+      process.exit(1);
+    }
+  });
 
 // ============================================================================
 // init command
@@ -354,6 +373,45 @@ db.command('cleanup')
     }
   });
 
+db.command('ensure-schema')
+  .description('Ensure database schema is fully up to date (idempotent)')
+  .option('--url <url>', 'Database connection URL')
+  .option('--host <host>', 'Database host')
+  .option('--port <port>', 'Database port', '5432')
+  .option('--database <database>', 'Database name')
+  .option('--user <user>', 'Database user')
+  .option('--password <password>', 'Database password')
+  .option('--ssl', 'Enable SSL connection')
+  .action(async (options) => {
+    try {
+      const database = createDatabaseFromOptions(options);
+
+      // Test connection
+      const connected = await testConnection(database);
+      if (!connected) {
+        throw new Error('Database connection failed');
+      }
+
+      // Ensure schema is up to date
+      const result = await ensureSchemaUpToDate(database);
+
+      console.log(chalk.green(`\n[db] ✓ Schema ensured`));
+      console.log(`  • Re-applied: ${result.reapplied}`);
+      console.log(`  • Warnings: ${result.errors.length}`);
+
+      if (result.errors.length > 0) {
+        console.log(chalk.yellow('\nWarnings:'));
+        result.errors.forEach((err) => console.log(chalk.yellow(`  • ${err}`)));
+      }
+
+      closeDatabase(database);
+      process.exit(0);
+    } catch (error) {
+      console.error(chalk.red('\n[db] ✗ Error:'), error);
+      process.exit(1);
+    }
+  });
+
 // ============================================================================
 // maintenance command group
 // ============================================================================
@@ -592,6 +650,7 @@ async function runInteractiveMode() {
       name: 'action',
       message: 'What would you like to do?',
       choices: [
+        { name: '🛠️  Complete Service Setup', value: 'setup' },
         { name: '🚀 Trigger a pipeline', value: 'trigger' },
         { name: '📊 Check pipeline status', value: 'status' },
         { name: '🔍 List services', value: 'services' },
@@ -612,6 +671,9 @@ async function runInteractiveMode() {
   }
 
   switch (action) {
+    case 'setup':
+      await handleSetupInteractive();
+      break;
     case 'trigger':
       await handleTriggerInteractive();
       break;
@@ -1611,6 +1673,58 @@ async function handleDlqInteractive() {
 
   console.log(chalk.blue(`\nUsing orchestrator: ${orchestratorUrl}`));
   console.log(chalk.yellow('Note: DLQ operations not yet implemented\n'));
+}
+
+async function handleSetupInteractive() {
+  try {
+    const result = await runSetup();
+
+    if (result.success) {
+      // Ask if user wants to save this as a connection
+      const { saveConn } = await inquirer.prompt([
+        {
+          type: 'confirm',
+          name: 'saveConn',
+          message: 'Would you like to save this configuration as a connection?',
+          default: true,
+        },
+      ]);
+
+      if (saveConn) {
+        const { connName } = await inquirer.prompt([
+          {
+            type: 'input',
+            name: 'connName',
+            message: 'Connection name:',
+            default: 'default',
+            validate: (input) => {
+              if (!input) return 'Name is required';
+              if (getConnection(input)) return 'A connection with this name already exists';
+              return true;
+            },
+          },
+        ]);
+
+        // Parse the DATABASE_URL to extract connection details
+        const dbUrl = result.databaseUrl;
+
+        const newConnection: Omit<Connection, 'createdAt' | 'lastUsed'> = {
+          name: connName,
+          orchestratorUrl: undefined, // User can set this later
+          database: {
+            url: dbUrl,
+          },
+        };
+
+        saveConnection(newConnection);
+        selectedConnection = getConnection(connName);
+
+        console.log(chalk.green(`\n✓ Connection '${connName}' saved successfully!\n`));
+      }
+    }
+  } catch (error) {
+    console.error(chalk.red('\n✗ Setup failed:'), error);
+  }
 }
 
 async function handleInitInteractive() {

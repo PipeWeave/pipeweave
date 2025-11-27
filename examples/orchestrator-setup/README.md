@@ -7,7 +7,6 @@ This example demonstrates how to set up and configure the PipeWeave orchestrator
 The orchestrator is the core execution engine that manages pipelines, queues tasks, and coordinates workers. This example shows:
 
 - Basic orchestrator setup with code configuration
-- Environment variable-based configuration
 - Multiple storage backend configurations
 - Standalone vs. serverless modes
 
@@ -60,9 +59,17 @@ const orchestrator = createOrchestrator({
   secretKey: "your-secret-key",
   mode: "standalone",
   maxConcurrency: 10,
+  port: 3000,
 });
 
+// Initialize database connection and storage
 await orchestrator.start();
+
+// Create HTTP server and start listening
+const server = orchestrator.createServer();
+await server.listen(3000, () => {
+  console.log('Orchestrator ready!');
+});
 ```
 
 **Run:**
@@ -71,29 +78,7 @@ await orchestrator.start();
 npm start
 ```
 
-### 2. Environment Variable Configuration
-
-Configure the orchestrator using environment variables (recommended for production):
-
-```typescript
-import { createOrchestratorFromEnv } from "@pipeweave/orchestrator";
-
-const orchestrator = createOrchestratorFromEnv();
-await orchestrator.start();
-```
-
-**Setup:**
-
-```bash
-# Copy the example .env file
-cp .env.example .env
-
-# Edit .env with your configuration
-# Then run:
-npm run start:env
-```
-
-### 3. Maintenance Mode
+### 2. Maintenance Mode
 
 Demonstrates how to use maintenance mode for database migrations:
 
@@ -299,8 +284,21 @@ Once the orchestrator is running, the following endpoints are available:
 ### Starting and Stopping
 
 ```typescript
-await orchestrator.start(); // Initialize and connect
-await orchestrator.stop(); // Graceful shutdown
+// Initialize database connection and storage
+await orchestrator.start();
+
+// Create HTTP server
+const server = orchestrator.createServer();
+
+// Start listening on a port
+await server.listen(3000);
+// With callback:
+await server.listen(3000, () => {
+  console.log('Server is ready!');
+});
+
+// Graceful shutdown (stops HTTP server, closes database)
+await server.stop();
 ```
 
 ### Maintenance Mode

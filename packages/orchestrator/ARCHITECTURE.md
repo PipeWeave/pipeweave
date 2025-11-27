@@ -74,13 +74,28 @@ Main orchestrator class that manages:
 - `getDatabase()` - Get database instance
 - `canAcceptTasks()` - Check maintenance mode
 
-### 2. Express Server (bin/server.ts)
+### 2. HTTP Server & Routes
 
-HTTP server that:
-- Creates orchestrator from environment
-- Registers all routes
-- Handles graceful shutdown (SIGTERM, SIGINT)
-- Provides request logging in development
+The orchestrator creates its own Express server internally and exposes its functionality through HTTP routes.
+
+**Usage Pattern:**
+```typescript
+const orchestrator = createOrchestrator(config);
+await orchestrator.start();           // Initialize database & storage
+
+const server = orchestrator.createServer();
+await server.listen(3000, () => {     // Start HTTP server
+  console.log('Ready!');
+});
+```
+
+The orchestrator handles:
+- Express app creation and configuration
+- Route registration (all API endpoints)
+- HTTP server lifecycle via `createServer()`
+- Graceful shutdown (SIGTERM, SIGINT)
+
+See `examples/orchestrator-setup/src/server.ts` for a complete example.
 
 **Middleware Stack:**
 - CORS support
@@ -118,15 +133,21 @@ Each route module exports a registration function that takes `Express` and regis
 ### 5. Maintenance Mode
 
 Three states:
-- `normal` - Accept and process tasks
+- `running` - Accept and process tasks
 - `waiting_for_maintenance` - No new tasks, waiting for completion
 - `maintenance` - No tasks running, safe for migrations
+
+**Transition Mechanism (Event-Driven):**
+- Maintenance mode transitions are event-driven, triggered when task status changes
+- When a task completes or fails, the system checks if auto-transition is needed
+- No polling interval required - transitions happen immediately when conditions are met
+- Works identically in both standalone and serverless modes
 
 **Endpoints:**
 - `requestMaintenance()` - Transition to waiting state
 - `enterMaintenance()` - Enter maintenance (only if no tasks running)
 - `exitMaintenance()` - Return to normal
-- Auto-transition via background checker (every 5s default)
+- Auto-transition occurs when last task completes while in `waiting_for_maintenance` state
 
 ## API Endpoints
 
@@ -267,7 +288,6 @@ MODE=serverless  # or 'standalone'
 - `DLQ_RETENTION_DAYS` (default: `30`)
 - `IDEMPOTENCY_TTL_SECONDS` (default: `86400`)
 - `MAX_RETRY_DELAY_MS` (default: `86400000`)
-- `MAINTENANCE_CHECK_INTERVAL_MS` (default: `5000`)
 
 ## Database Schema
 
@@ -369,25 +389,27 @@ npm start
 - ✅ Database connection & schema (via @pipeweave/cli)
 - ✅ Maintenance mode logic (orchestrator.ts, maintenance.ts)
 - ✅ Storage backend configuration (multi-provider support)
-- ✅ Express server setup (bin/server.ts)
 - ✅ Basic route structure (routes/*)
 - ✅ JWT encryption/decryption (storage/jwt.ts)
 - ✅ Internal types (types/internal.ts)
+- ✅ Example server implementation (examples/orchestrator-setup)
 
 **Files Created:**
-- `src/bin/server.ts`
 - `src/routes/*.ts` (all route files with stubs)
 - `src/storage/jwt.ts`
 - `src/types/internal.ts`
 - `.env.example`
+- `examples/orchestrator-setup/src/server.ts`
 
 ---
 
-### Phase 2: Core Execution 🎯
+### Phase 2: Core Execution ✅
+
+**Status**: Complete
 
 **Priority**: HIGH - Core functionality required for basic operation
 
-#### 2.1 Service Registration
+#### 2.1 Service Registration ✅
 
 **File**: `src/core/registry.ts`
 
@@ -463,15 +485,17 @@ npm start
    - Mark pending `task_runs` for orphaned tasks as `cancelled`
    - Set `error` to "Task type removed in version X.Y.Z"
 
-**Testing:**
-- Register service with tasks
-- Register again with same code (no changes)
-- Register with modified code (version increments)
-- Register with removed task (orphan cleanup)
+**Implementation Complete:**
+- ✅ SHA-256 code hash calculation
+- ✅ Atomic service/task upsert with version tracking
+- ✅ Code history recording on hash changes
+- ✅ Orphan cleanup for removed tasks
+- ✅ Service registration endpoint (`POST /api/register`)
+- ✅ Service listing endpoints (`GET /api/services`, `/api/services/:id`)
 
 ---
 
-#### 2.2 Task Queue Implementation
+#### 2.2 Task Queue Implementation ✅
 
 **File**: `src/core/queue-manager.ts`
 
@@ -546,16 +570,17 @@ npm start
    - Implement `GET /api/queue/status`
    - Implement `GET /api/queue/items`
 
-**Testing:**
-- Queue task with default priority
-- Queue task with custom priority
-- Queue batch of tasks
-- Verify priority ordering
-- Check concurrency limits
+**Implementation Complete:**
+- ✅ Priority-based queue ordering (lower = higher priority)
+- ✅ Concurrency limit checking per task type
+- ✅ Idempotency key checking
+- ✅ Batch queueing support
+- ✅ Queue status aggregation
+- ✅ Queue endpoints (`POST /api/queue/task`, `/api/queue/batch`, `GET /api/queue/status`)
 
 ---
 
-#### 2.3 Task Dispatcher
+#### 2.3 Task Dispatcher ✅
 
 **File**: `src/core/executor.ts`
 
@@ -633,16 +658,16 @@ npm start
    - Worker returns 5xx → Mark as failed, schedule retry
    - Timeout → Mark as timeout, schedule retry
 
-**Testing:**
-- Dispatch task to mock worker
-- Handle worker offline
-- Handle worker errors
-- Verify JWT generation
-- Check payload structure
+**Implementation Complete:**
+- ✅ JWT generation with storage credentials
+- ✅ HTTP POST to worker endpoints with 5s timeout
+- ✅ Task dispatch payload building
+- ✅ Error handling (offline, 4xx, 5xx responses)
+- ✅ Automatic failure marking on dispatch errors
 
 ---
 
-#### 2.4 Heartbeat Monitoring
+#### 2.4 Heartbeat Monitoring ✅
 
 **File**: `src/core/heartbeat-monitor.ts`
 
@@ -740,15 +765,16 @@ npm start
    - Implement `POST /api/heartbeat`
    - Call `heartbeatMonitor.recordHeartbeat()`
 
-**Testing:**
-- Start tracking, send heartbeats
-- Verify timeout triggers when no heartbeat
-- Verify timeout cancelled on callback
-- Test concurrent heartbeats for multiple tasks
+**Implementation Complete:**
+- ✅ In-memory heartbeat tracking with Map
+- ✅ Timeout = 2× heartbeatIntervalMs
+- ✅ Automatic timeout handling and task failure
+- ✅ Timeout cancellation on callback
+- ✅ Heartbeat endpoint (`POST /api/heartbeat`)
 
 ---
 
-#### 2.5 Callback Handling
+#### 2.5 Callback Handling ✅
 
 **File**: Update `routes/tasks.ts` and create retry logic
 
@@ -842,16 +868,20 @@ npm start
    }
    ```
 
-**Testing:**
-- Callback with success
-- Callback with failure (retry)
-- Callback with failure (no retries, DLQ)
-- Programmatic next selection
-- Verify heartbeat cancelled
+**Implementation Complete:**
+- ✅ Success handling with output metadata storage
+- ✅ Failure handling with retry scheduling
+- ✅ Exponential/fixed backoff calculation
+- ✅ DLQ addition after exhausting retries
+- ✅ Idempotency result caching
+- ✅ Callback endpoint (`POST /api/callback/:runId`)
+- ✅ Retry Manager (`src/core/retry-manager.ts`)
+- ✅ DLQ Manager (`src/core/dlq-manager.ts`)
+- ✅ Idempotency Manager (`src/core/idempotency.ts`)
 
 ---
 
-#### 2.6 Standalone Poller
+#### 2.6 Standalone Poller ✅
 
 **File**: `src/core/poller.ts`
 
@@ -968,12 +998,37 @@ npm start
    });
    ```
 
-**Testing:**
-- Start poller in standalone mode
-- Verify tasks are dispatched automatically
-- Stop poller gracefully
-- Test /api/tick in serverless mode
-- Verify concurrency limits respected
+**Implementation Complete:**
+- ✅ Polling loop with configurable interval
+- ✅ Automatic task fetching and dispatching
+- ✅ Heartbeat monitoring integration
+- ✅ Error handling and retry scheduling
+- ✅ Graceful startup/shutdown
+- ✅ Serverless mode support via `/api/tick`
+- ✅ Manual poll trigger for serverless mode
+- ✅ Task Poller (`src/core/poller.ts`)
+- ✅ Integration with Orchestrator class
+
+**Phase 2 Summary:**
+
+All core execution components are now implemented and integrated:
+- Service registration with code versioning
+- Task queueing with priority and concurrency controls
+- Task dispatching to workers via HTTP
+- Heartbeat monitoring with timeout detection
+- Callback handling with retry logic and DLQ
+- Standalone polling mode for autonomous operation
+- Serverless mode support via manual tick endpoint
+
+The orchestrator can now:
+- Accept worker registrations
+- Queue standalone tasks
+- Dispatch tasks to workers
+- Monitor execution via heartbeats
+- Handle success/failure callbacks
+- Retry failed tasks with configurable backoff
+- Move failed tasks to DLQ after retries exhausted
+- Support both standalone and serverless deployment modes
 
 ---
 

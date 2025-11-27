@@ -4,36 +4,28 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-## Features
+PipeWeave lets you build reliable, observable workflows that are **easy to debug locally** and **simple to deploy anywhere**. Define tasks as code, orchestrate complex pipelines, and get first-class observability out of the box.
 
-- **Local debuggability** — Set breakpoints in your IDE and step through task handlers
-- **Serverless-first** — Deploy tasks anywhere (Cloud Run, Lambda, Kubernetes, bare metal)
-- **Programmatic pipeline definition** — Define workflows in code with dynamic routing
-- **Simple data passing** — Single hydrated context per task with automatic S3 persistence
-- **Reliable execution** — Heartbeat monitoring, automatic retries, timeout handling
+## Why PipeWeave?
 
-## Packages
-
-| Package                                              | Description                                                       |
-| ---------------------------------------------------- | ----------------------------------------------------------------- |
-| [`@pipeweave/sdk`](./sdks/nodejs)                    | Worker SDK for Node.js — [docs](./sdks/nodejs/README.md)          |
-| [`@pipeweave/orchestrator`](./packages/orchestrator) | Task execution engine — [docs](./packages/orchestrator/README.md) |
-| [`@pipeweave/cli`](./packages/cli)                   | Command line interface — [docs](./packages/cli/README.md)         |
-| [`@pipeweave/ui`](./packages/ui)                     | Web monitoring dashboard — [docs](./packages/ui/README.md)        |
-| [`@pipeweave/shared`](./packages/shared)             | Shared types and utilities — [docs](./packages/shared/README.md)  |
+- **🐛 Local debuggability** — Set breakpoints in your IDE and step through task handlers like regular code
+- **☁️ Deploy anywhere** — Cloud Run, Lambda, Kubernetes, or bare metal—your choice
+- **📝 Code-first pipelines** — Define workflows in TypeScript with full type safety and IDE support
+- **🔄 Built-in reliability** — Automatic retries, heartbeat monitoring, and dead letter queues
+- **📊 Observable by default** — Track every task execution, view logs, and monitor pipeline health
 
 ## Quick Start
 
-### Installation
+### 1. Install
 
 ```bash
 npm install @pipeweave/sdk
 ```
 
-### Define Tasks
+### 2. Define Tasks
 
 ```typescript
-import { createWorker, TaskResult } from "@pipeweave/sdk";
+import { createWorker } from "@pipeweave/sdk";
 
 const worker = createWorker({
   orchestratorUrl: "http://localhost:3000",
@@ -47,13 +39,11 @@ worker.register("process", async (ctx) => {
   return { processed: true, result: data.toUpperCase() };
 });
 
-// Task with programmatic next selection
+// Task with routing
 worker.register(
   "router",
-  {
-    allowedNext: ["path-a", "path-b"],
-  },
-  async (ctx): Promise<TaskResult> => {
+  { allowedNext: ["path-a", "path-b"] },
+  async (ctx) => {
     if (ctx.input.fast) {
       return { output: { routed: true }, runNext: ["path-a"] };
     }
@@ -61,84 +51,10 @@ worker.register(
   }
 );
 
-// Idempotent task
-worker.register(
-  "payment",
-  {
-    idempotencyKey: (input, codeVersion) => `v${codeVersion}-${input.orderId}`,
-    retries: 3,
-  },
-  async (ctx) => {
-    ctx.log.info(`Processing payment v${ctx.codeVersion}`);
-    return { success: true };
-  }
-);
-
 worker.listen(8080);
 ```
 
-### Define Orchestrator
-
-```typescript
-import { createOrchestrator } from "@pipeweave/orchestrator";
-
-const orchestrator = createOrchestrator({
-  databaseUrl: "postgresql://localhost:5432/pipeweave",
-  storageBackends: [
-    // Local filesystem (for development)
-    {
-      id: "local-dev",
-      provider: "local",
-      endpoint: "file://",
-      bucket: "data",
-      credentials: { basePath: "./storage" },
-      isDefault: true,
-    },
-    // AWS S3 (for production)
-    // {
-    //   id: "primary-s3",
-    //   provider: "aws-s3",
-    //   endpoint: "https://s3.amazonaws.com",
-    //   bucket: "pipeweave-prod",
-    //   region: "us-east-1",
-    //   credentials: {
-    //     accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-    //     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
-    //   },
-    // },
-    // Google Cloud Storage
-    // {
-    //   id: "gcs-backup",
-    //   provider: "gcs",
-    //   endpoint: "https://storage.googleapis.com",
-    //   bucket: "pipeweave-backup",
-    //   credentials: {
-    //     projectId: process.env.GCP_PROJECT_ID!,
-    //     clientEmail: process.env.GCP_CLIENT_EMAIL!,
-    //     privateKey: process.env.GCP_PRIVATE_KEY!,
-    //   },
-    // },
-    // MinIO (self-hosted S3-compatible)
-    // {
-    //   id: "local-minio",
-    //   provider: "minio",
-    //   endpoint: "http://localhost:9000",
-    //   bucket: "pipeweave-dev",
-    //   credentials: {
-    //     accessKey: "minioadmin",
-    //     secretKey: "minioadmin",
-    //   },
-    // },
-  ],
-  secretKey: process.env.PIPEWEAVE_SECRET_KEY!,
-  mode: "standalone",
-  port: 3000,
-});
-
-await orchestrator.start();
-```
-
-### Local Testing
+### 3. Test Locally
 
 ```typescript
 import { runLocal } from "@pipeweave/sdk";
@@ -150,378 +66,391 @@ const result = await runLocal(worker, "process", {
 console.log(result.output); // { processed: true, result: 'HELLO' }
 ```
 
-## Project Structure
+### 4. Set Up Database
 
-```
-pipeweave/
-├── packages/
-│   ├── shared/          # Shared types, constants, utilities
-│   ├── orchestrator/    # Core execution engine
-│   ├── cli/             # Command line tool
-│   └── ui/              # Next.js web dashboard
-├── sdks/
-│   └── nodejs/          # Node.js SDK
-├── examples/            # Example projects
-└── docs/                # Documentation
-```
-
-## Setup Guide
-
-### Prerequisites
-
-- **Node.js >= 18** and **npm >= 9**
-- **PostgreSQL** (for orchestrator database)
-- **Storage Backend** (Local filesystem, AWS S3, Google Cloud Storage, or MinIO)
-
-### Architecture Overview
-
-PipeWeave consists of several modules that work together:
-
-1. **[@pipeweave/shared](./packages/shared)** — Shared types, constants, and utilities used by all packages
-2. **[@pipeweave/sdk](./sdks/nodejs)** — Node.js SDK for creating worker services that execute tasks
-3. **[@pipeweave/orchestrator](./packages/orchestrator)** — Core execution engine that manages pipelines and coordinates workers
-4. **[@pipeweave/cli](./packages/cli)** — Command-line tool for triggering pipelines and managing the system
-5. **[@pipeweave/ui](./packages/ui)** — Web dashboard for monitoring pipeline runs and task execution
-
-### How They Work Together
-
-```mermaid
-graph TB
-    Worker["Workers<br/>@pipeweave/sdk"]
-    Orch["Orchestrator<br/>@pipeweave/orchestrator"]
-    CLI["CLI<br/>@pipeweave/cli"]
-    UI["Dashboard<br/>@pipeweave/ui"]
-    DB[("PostgreSQL<br/>metadata")]
-    S3[("S3/MinIO<br/>task data")]
-
-    Worker -->|"Register tasks"| Orch
-    Orch -->|"Task execution requests"| Worker
-    CLI -->|"Trigger pipelines<br/>Query status"| Orch
-    UI -->|"Fetch runs & stats"| Orch
-
-    Orch -.->|"Store metadata"| DB
-    Orch -.->|"Store task I/O"| S3
-    Worker -.->|"Direct access"| S3
-```
-
-**Data Flow:**
-
-```mermaid
-sequenceDiagram
-    participant Worker
-    participant Orchestrator
-    participant S3
-    participant DB
-
-    Note over Worker,Orchestrator: 1. Worker Registration
-    Worker->>Orchestrator: 1.1 Register tasks with code hashes
-    Orchestrator->>DB: 1.2 Store task definitions
-
-    Note over Orchestrator,DB: 2. Pipeline Trigger
-    Orchestrator->>S3: 2.1 Store input data
-    Orchestrator->>DB: 2.2 Create pipeline run & queue tasks
-
-    rect rgb(240, 248, 255)
-        Note over Orchestrator: Polling Loop (every 1s in standalone mode)
-        Orchestrator->>DB: 2.3 Poll for pending tasks
-    end
-
-    Note over Worker,S3: 3. Task Execution
-    Orchestrator->>Worker: 3.1 Send JWT + S3 path
-    Worker->>S3: 3.2 Fetch input directly
-
-    rect rgb(255, 250, 240)
-        Note over Worker,Orchestrator: Heartbeat Loop (every 60s default)
-        Worker->>Orchestrator: 3.3 Heartbeat (progress)
-    end
-
-    Worker->>S3: 3.4 Store output directly
-    Worker->>Orchestrator: 3.5 Callback (metadata only)
-
-    Note over Orchestrator,DB: 4. Next Task
-    Orchestrator->>DB: 4.1 Queue downstream tasks
-
-    rect rgb(240, 248, 255)
-        Note over Orchestrator: Polling Loop continues
-        Orchestrator->>DB: 4.2 Poll for next pending tasks
-    end
-```
-
-### Complete Setup
-
-#### 1. Clone and Install
+Initialize the database schema using the CLI:
 
 ```bash
-# Clone the repository
-git clone https://github.com/pipeweave/pipeweave.git
-cd pipeweave
+# Interactive setup wizard (recommended)
+npx @pipeweave/cli setup
 
-# Install dependencies for all packages
-npm install
-
-# Build all packages (builds in dependency order)
-npm run build
+# Or manual migration
+npx @pipeweave/cli db migrate --url postgresql://localhost:5432/pipeweave
 ```
 
-#### 2. Set Up Infrastructure
+### 5. Create Orchestrator Service
 
-**PostgreSQL Database:**
+Create a file `orchestrator.ts`:
 
-```bash
-# Using Docker
-docker run -d \
-  --name pipeweave-db \
-  -e POSTGRES_DB=pipeweave \
-  -e POSTGRES_USER=pipeweave \
-  -e POSTGRES_PASSWORD=pipeweave \
-  -p 5432:5432 \
-  postgres:15
+```typescript
+import { createOrchestrator } from "@pipeweave/orchestrator";
 
-# Or install PostgreSQL natively and create database
-createdb pipeweave
-```
-
-**Storage Backend:**
-
-Choose one of the following storage backends:
-
-**Option 1: Local Filesystem (Simplest for development)**
-
-No external dependencies required — files are stored in a local directory:
-
-```bash
-# Set in .env or orchestrator config
-STORAGE_PROVIDER=local
-S3_ENDPOINT=file://
-S3_BUCKET=data
-LOCAL_STORAGE_BASE_PATH=./storage
-```
-
-**Option 2: MinIO (Self-hosted S3-compatible)**
-
-```bash
-# Using Docker
-docker run -d \
-  --name pipeweave-minio \
-  -e MINIO_ROOT_USER=minioadmin \
-  -e MINIO_ROOT_PASSWORD=minioadmin \
-  -p 9000:9000 \
-  -p 9001:9001 \
-  minio/minio server /data --console-address ":9001"
-
-# Create bucket via MinIO console at http://localhost:9001
-# Or use mc CLI:
-mc alias set local http://localhost:9000 minioadmin minioadmin
-mc mb local/pipeweave
-```
-
-**Option 3: AWS S3**
-
-Create an S3 bucket and IAM user with appropriate permissions.
-
-**Option 4: Google Cloud Storage**
-
-Create a GCS bucket and service account with Storage Admin role.
-
-#### 3. Configure Environment
-
-```bash
-# Copy example environment file
-cp .env.example .env
-
-# Generate a secure secret key
-openssl rand -hex 32
-
-# Edit .env and set your values
-# At minimum, configure:
-# - DATABASE_URL
-# - S3_* variables
-# - PIPEWEAVE_SECRET_KEY (use the generated key above)
-```
-
-**Required variables:**
-
-- `DATABASE_URL` — PostgreSQL connection string
-- `STORAGE_BACKENDS` — JSON array of storage backend configurations, or use legacy single-backend variables (see below)
-- `PIPEWEAVE_SECRET_KEY` — Shared encryption key (must be same on orchestrator and all workers)
-
-**Storage Configuration Examples:**
-
-```bash
-# Multi-backend configuration (supports Local, AWS S3, GCS, and MinIO simultaneously)
-STORAGE_BACKENDS='[
-  {
-    "id": "primary-s3",
-    "provider": "aws-s3",
-    "endpoint": "https://s3.amazonaws.com",
-    "bucket": "pipeweave-prod",
-    "region": "us-east-1",
-    "credentials": {
-      "accessKeyId": "AKIA...",
-      "secretAccessKey": "..."
-    },
-    "isDefault": true
-  },
-  {
-    "id": "local-minio",
-    "provider": "minio",
-    "endpoint": "http://localhost:9000",
-    "bucket": "pipeweave-dev",
-    "credentials": {
-      "accessKey": "minioadmin",
-      "secretKey": "minioadmin"
-    }
-  }
-]'
-DEFAULT_STORAGE_BACKEND_ID=primary-s3
-```
-
-#### 4. Initialize Database
-
-```bash
-# Initialize database schema
-npx @pipeweave/cli db init --url $DATABASE_URL
-
-# Or if using npm scripts:
-npm run build:packages  # Ensure CLI is built
-node packages/cli/dist/index.js db init --url $DATABASE_URL
-```
-
-#### 5. Start the Orchestrator
-
-```bash
-# Development mode (with auto-reload)
-npm run dev:orchestrator
-
-# Or production mode
-cd packages/orchestrator
-npm run build
-npm start
-
-# The orchestrator will start on http://localhost:3000
-```
-
-#### 6. Create and Start a Worker Service
-
-**Create a new worker project:**
-
-```bash
-# In a separate directory
-mkdir my-worker && cd my-worker
-npm init -y
-npm install @pipeweave/sdk
-
-# Create worker.ts
-cat > worker.ts << 'EOF'
-import { createWorker } from "@pipeweave/sdk";
-
-const worker = createWorker({
-  orchestratorUrl: process.env.PIPEWEAVE_ORCHESTRATOR_URL!,
-  serviceId: "my-service",
+const orchestrator = createOrchestrator({
+  databaseUrl: "postgresql://localhost:5432/pipeweave",
+  storageBackends: [{
+    id: "local-dev",
+    provider: "local",
+    endpoint: "file://",
+    bucket: "data",
+    credentials: { basePath: "./storage" },
+    isDefault: true,
+  }],
   secretKey: process.env.PIPEWEAVE_SECRET_KEY!,
+  mode: "standalone",
+  port: 3000,
 });
 
-worker.register("hello", async (ctx) => {
-  return { message: `Hello, ${ctx.input.name}!` };
+await orchestrator.start();
+const server = orchestrator.createServer();
+await server.listen(3000, () => console.log("Orchestrator ready!"));
+```
+
+### 6. Run in Production
+
+Start the orchestrator and trigger pipelines:
+
+```bash
+# Start your orchestrator service
+npx tsx orchestrator.ts
+
+# Trigger a pipeline via CLI
+npx @pipeweave/cli trigger my-pipeline -i '{"data": "hello"}'
+
+# Or via HTTP API
+curl -X POST http://localhost:3000/api/pipelines/my-pipeline/trigger \
+  -H "Content-Type: application/json" \
+  -d '{"input": {"data": "hello"}}'
+```
+
+## Core Concepts
+
+### Tasks
+
+Self-contained units of work that process input and produce output:
+
+```typescript
+worker.register(
+  "send-email",
+  {
+    retries: 3,
+    retryBackoff: "exponential",
+    idempotencyKey: (input, version) => `v${version}-${input.userId}`,
+  },
+  async (ctx) => {
+    await emailService.send({
+      to: ctx.input.email,
+      subject: "Welcome!",
+    });
+    return { sent: true };
+  }
+);
+```
+
+### Pipelines
+
+Directed acyclic graphs (DAGs) of tasks with dynamic routing:
+
+```typescript
+// Tasks define what can run next
+worker.register("fetch", { allowedNext: ["validate", "transform"] }, ...);
+worker.register("validate", { allowedNext: ["save"] }, ...);
+worker.register("transform", { allowedNext: ["save"] }, ...);
+worker.register("save", { allowedNext: [] }, ...); // End node
+```
+
+### Context Hydration
+
+Each task receives full context including all upstream outputs:
+
+```typescript
+worker.register("summarize", async (ctx) => {
+  // Access outputs from previous tasks
+  const userData = ctx.upstream["fetch-user"].output;
+  const orderData = ctx.upstream["fetch-orders"].output;
+
+  return {
+    summary: `${userData.name} has ${orderData.orders.length} orders`,
+  };
 });
-
-worker.listen(8080);
-EOF
-
-# Start the worker
-PIPEWEAVE_ORCHESTRATOR_URL=http://localhost:3000 \
-PIPEWEAVE_SECRET_KEY=your-secret-key \
-npx tsx worker.ts
 ```
-
-The worker will automatically register its tasks with the orchestrator.
-
-#### 7. Start the UI Dashboard (Optional)
-
-```bash
-# In the pipeweave repo root
-npm run dev:ui
-
-# The dashboard will start on http://localhost:4000
-```
-
-#### 8. Test Your Setup
-
-```bash
-# List registered services
-npx @pipeweave/cli services --url http://localhost:3000
-
-# Queue a test task
-npx @pipeweave/cli trigger my-pipeline \
-  -i '{"name": "World"}' \
-  --url http://localhost:3000
-
-# Check run status
-npx @pipeweave/cli status <run-id> --url http://localhost:3000
-
-# Or view in the dashboard
-open http://localhost:4000
-```
-
-### Development Workflow
-
-**Start everything in development mode:**
-
-```bash
-# Terminal 1: Start orchestrator
-npm run dev:orchestrator
-
-# Terminal 2: Start UI
-npm run dev:ui
-
-# Terminal 3: Start your worker service
-cd path/to/your/worker
-npm run dev
-
-# Terminal 4: Use CLI to trigger pipelines
-npx @pipeweave/cli trigger <pipeline-id> -i '{...}'
-```
-
-**Watch mode for all packages:**
-
-```bash
-# Run all packages in dev mode simultaneously
-npm run dev
-```
-
-### Common Commands
-
-```bash
-# Build all packages
-npm run build
-
-# Build only core packages (shared, sdk, orchestrator, cli)
-npm run build:packages
-
-# Run all tests
-npm test
-
-# Type check all packages
-npm run typecheck
-
-# Lint all code
-npm run lint
-
-# Format all code
-npm run format
-
-# Clean build artifacts
-npm run clean
-```
-
-## Architecture
-
-For detailed architecture, API reference, and complete specification, see [SPEC.md](./SPEC.md).
 
 ## Documentation
 
-See [SPEC.md](./SPEC.md) for the full specification.
+- **[Getting Started](./docs/getting-started.md)** — Complete setup guide from zero to production
+- **[Architecture](./docs/architecture.md)** — How PipeWeave works under the hood
+- **[Configuration](./docs/configuration.md)** — Environment variables and tuning options
+- **[Examples](./docs/examples.md)** — Real-world patterns and code samples
+- **[API Reference](./SPEC.md)** — Complete API specification
+
+## Packages
+
+| Package | Description |
+|---------|-------------|
+| [@pipeweave/sdk](./sdks/nodejs) | Worker SDK for Node.js |
+| [@pipeweave/orchestrator](./packages/orchestrator) | Task execution engine |
+| [@pipeweave/cli](./packages/cli) | Command line interface |
+| [@pipeweave/ui](./packages/ui) | Web monitoring dashboard |
+| [@pipeweave/shared](./packages/shared) | Shared types and utilities |
+
+## Features
+
+### Reliability
+
+- **Automatic retries** with exponential or fixed backoff
+- **Heartbeat monitoring** to detect stuck tasks
+- **Idempotency** to prevent duplicate execution
+- **Dead letter queue** for manual intervention
+- **Timeout handling** per task or globally
+
+### Observability
+
+- **Real-time dashboard** to monitor pipeline execution
+- **Structured logging** for every task run
+- **Progress reporting** for long-running tasks
+- **Code versioning** to track task changes over time
+- **Full audit trail** of all executions
+
+### Developer Experience
+
+- **Local testing** with `runLocal()` helper
+- **TypeScript-first** with full type safety
+- **IDE integration** with breakpoint debugging
+- **Hot reload** in development mode
+- **Simple deployment** with Docker or serverless
+
+## Use Cases
+
+- **Data pipelines** — ETL, data processing, batch jobs
+- **Workflow automation** — User onboarding, order fulfillment, content moderation
+- **Integration flows** — Connect APIs, sync data, handle webhooks
+- **Scheduled jobs** — Reports, cleanups, notifications
+- **Event-driven systems** — Process events from queues or streams
+
+## Deployment Modes
+
+### Standalone Mode
+
+Orchestrator runs continuously with internal polling:
+
+```typescript
+const orchestrator = createOrchestrator({
+  mode: "standalone",
+  pollIntervalMs: 1000,
+  // ...
+});
+```
+
+**Best for:** VMs, containers, dedicated servers
+
+### Serverless Mode
+
+External scheduler triggers task processing on a regular interval (tick-based execution):
+
+```typescript
+const orchestrator = createOrchestrator({
+  mode: "serverless",
+  // No polling—triggered externally via POST /api/tick
+});
+```
+
+The orchestrator processes tasks whenever it receives a tick request. Use a scheduler like **Cloud Scheduler** (GCP), **EventBridge** (AWS), or **cron** to trigger the `/api/tick` endpoint on your desired interval (e.g., every minute):
+
+```bash
+# Example: Trigger tick endpoint
+curl -X POST https://your-orchestrator.run.app/api/tick \
+  -H "Authorization: Bearer $PIPEWEAVE_SECRET_KEY"
+```
+
+**Best for:** Cloud Run, Lambda, AWS Fargate, or any serverless platform with external scheduling
+
+## Architecture
+
+```mermaid
+graph TB
+    CLI["CLI/API"] -->|Trigger| Orch["Orchestrator"]
+    Orch -->|Queue tasks| DB[("PostgreSQL")]
+    Orch -->|Dispatch| Worker["Workers"]
+    Worker -->|Direct access| S3[("S3/Storage")]
+    Orch -.->|Store metadata| DB
+    Worker -->|Callback| Orch
+    UI["Dashboard"] -->|Query| Orch
+```
+
+**Key Design Decisions:**
+
+- **Workers access storage directly** — No proxy overhead, better performance
+- **PostgreSQL for metadata** — Proven reliability, rich query support
+- **JWT-encrypted credentials** — Secure temporary storage access
+- **HTTP-based communication** — Simple, debuggable, firewall-friendly
+
+Learn more in the [Architecture Guide](./docs/architecture.md).
+
+## Example: User Onboarding Pipeline
+
+```typescript
+// 1. Create account
+worker.register(
+  "create-account",
+  { allowedNext: ["send-email", "setup-workspace"] },
+  async (ctx) => {
+    const user = await db.users.create(ctx.input);
+    return { userId: user.id, email: user.email };
+  }
+);
+
+// 2a. Send welcome email (runs in parallel with 2b)
+worker.register(
+  "send-email",
+  { allowedNext: ["track-completion"] },
+  async (ctx) => {
+    const { email } = ctx.upstream["create-account"].output;
+    await emailService.send({ to: email, template: "welcome" });
+    return { sent: true };
+  }
+);
+
+// 2b. Setup workspace (runs in parallel with 2a)
+worker.register(
+  "setup-workspace",
+  { allowedNext: ["track-completion"] },
+  async (ctx) => {
+    const { userId } = ctx.upstream["create-account"].output;
+    const workspace = await db.workspaces.create({ ownerId: userId });
+    return { workspaceId: workspace.id };
+  }
+);
+
+// 3. Track completion (join task—waits for both 2a and 2b)
+worker.register(
+  "track-completion",
+  { allowedNext: [] },
+  async (ctx) => {
+    const { userId } = ctx.upstream["create-account"].output;
+    await analytics.track(userId, "onboarding_completed");
+    return { completed: true };
+  }
+);
+```
+
+See more examples in the [Examples Guide](./docs/examples.md).
+
+## Setup
+
+### Prerequisites
+
+- Node.js >= 18
+- PostgreSQL 15+
+- Storage backend (local filesystem, S3, GCS, or MinIO)
+
+### Installation
+
+```bash
+# Clone repository
+git clone https://github.com/pipeweave/pipeweave.git
+cd pipeweave
+
+# Install and build
+npm install
+npm run build
+
+# Setup database (interactive wizard)
+npx @pipeweave/cli setup
+
+# Or manually run migrations
+npx @pipeweave/cli db migrate --url postgresql://localhost:5432/pipeweave
+```
+
+### Create Your Orchestrator
+
+Create a file `my-orchestrator.ts`:
+
+```typescript
+import { createOrchestrator } from "@pipeweave/orchestrator";
+
+const orchestrator = createOrchestrator({
+  databaseUrl: process.env.DATABASE_URL!,
+  storageBackends: [{
+    id: "local-dev",
+    provider: "local",
+    endpoint: "file://",
+    bucket: "data",
+    credentials: { basePath: "./storage" },
+    isDefault: true,
+  }],
+  secretKey: process.env.PIPEWEAVE_SECRET_KEY!,
+  mode: "standalone",
+  port: 3000,
+});
+
+await orchestrator.start();
+const server = orchestrator.createServer();
+await server.listen(3000, () => console.log("Orchestrator ready!"));
+```
+
+See the [orchestrator-setup example](./examples/orchestrator-setup) for more configuration options.
+
+### Start Services
+
+```bash
+# Start orchestrator
+npx tsx my-orchestrator.ts
+
+# Start UI (optional)
+cd packages/ui && npm run dev
+```
+
+For detailed setup instructions, see the [Getting Started Guide](./docs/getting-started.md).
+
+## Configuration
+
+Minimal `.env` configuration:
+
+```bash
+# Database
+DATABASE_URL=postgresql://localhost:5432/pipeweave
+
+# Storage
+STORAGE_BACKENDS='[{
+  "id": "local-dev",
+  "provider": "local",
+  "endpoint": "file://",
+  "bucket": "data",
+  "credentials": {"basePath": "./storage"},
+  "isDefault": true
+}]'
+
+# Security
+PIPEWEAVE_SECRET_KEY=your-generated-secret-key
+```
+
+See the [Configuration Guide](./docs/configuration.md) for all options.
+
+## Contributing
+
+We welcome contributions! Please see [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
+
+## Community
+
+- **GitHub Issues** — Bug reports and feature requests
+- **Discussions** — Questions and community support
+- **Discord** — Real-time chat (coming soon)
+
+## Roadmap
+
+- [ ] Python SDK
+- [ ] Cron/scheduled pipeline triggers
+- [ ] Conditional task execution (skip logic)
+- [ ] Sub-pipelines (nested workflows)
+- [ ] GraphQL API
+- [ ] Prometheus metrics exporter
+- [ ] Terraform provider
 
 ## License
 
 MIT © PipeWeave Contributors
+
+---
+
+**Ready to get started?** → [Getting Started Guide](./docs/getting-started.md)
+
+**Need help?** → [GitHub Issues](https://github.com/pipeweave/pipeweave/issues)

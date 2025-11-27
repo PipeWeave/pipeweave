@@ -115,6 +115,134 @@ You can still use the CLI by:
 
 ## Commands
 
+### Complete Setup
+
+#### `pipeweave setup`
+
+Complete setup wizard for PipeWeave. This command walks you through:
+- Connecting to PostgreSQL with admin credentials
+- Creating a new database and user
+- Generating a strong password (with clipboard copy)
+- Granting appropriate permissions
+- Running all database migrations
+- Generating a PipeWeave secret key (with clipboard copy)
+
+```bash
+# Run the complete setup wizard
+pipeweave setup
+```
+
+**The wizard will guide you through:**
+
+1. **Database Connection**: Enter your PostgreSQL host, port, and admin credentials
+2. **New Database & User**: Specify the database name and user (defaults to `pipeweave`)
+3. **Password Generation**: Choose to generate a strong random password or enter your own
+4. **Secret Generation**: Automatically generates a secure PipeWeave secret key
+5. **Database Creation**: Creates the database if it doesn't exist
+6. **User Creation**: Creates the database user with the specified password
+7. **Permission Grants**: Grants all necessary permissions to the user
+8. **Schema Migrations**: Runs all database migrations to create tables
+9. **Connection Test**: Verifies the new user can connect successfully
+
+**Output:**
+
+After successful setup, you'll receive:
+```
+DATABASE_URL=postgresql://pipeweave:GENERATED_PASSWORD@localhost:5432/pipeweave
+PIPEWEAVE_SECRET_KEY=64_CHARACTER_HEX_STRING
+```
+
+Add these to your `.env` file or environment variables.
+
+**Example:**
+
+```bash
+$ pipeweave setup
+
+🚀 PipeWeave Service Setup
+
+Step 1: Database Connection
+Enter the connection details for your PostgreSQL admin user.
+
+? PostgreSQL host: localhost
+? PostgreSQL port: 5432
+? PostgreSQL admin user: postgres
+? PostgreSQL admin password: ****
+
+Step 2: New Database & User
+Configure the PipeWeave database and user.
+
+? Database name: pipeweave
+? Database user: pipeweave
+? Generate a strong password? Yes
+
+✓ Strong password generated!
+Password: xK9mP2vN8qR5wL3jH7tY4fG6sD1aZ0bC
+
+✓ Password copied to clipboard
+? Have you saved the password? Yes
+
+Step 3: PipeWeave Secret Key
+This secret is used to authenticate services with the orchestrator.
+
+✓ Secret key generated!
+Secret: a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6a7b8c9d0e1f2
+
+✓ Secret copied to clipboard
+? Have you saved the secret key? Yes
+
+📦 Setting up PipeWeave...
+
+✓ Connected to PostgreSQL
+✓ Database 'pipeweave' created
+✓ User 'pipeweave' created
+✓ Permissions granted to 'pipeweave'
+
+🔧 Running database migrations...
+
+[migrations] Found 2 migration files
+[migrations] Pending migrations: 2
+
+[migrations] Applying 001_initial_schema...
+[migrations] ✓ Applied 001_initial_schema (450ms)
+
+✓ Connection test successful
+
+✓ Setup complete!
+
+Database Configuration:
+──────────────────────────────────────────────────
+DATABASE_URL=postgresql://pipeweave:xK9mP2vN...@localhost:5432/pipeweave
+──────────────────────────────────────────────────
+
+PipeWeave Secret:
+──────────────────────────────────────────────────
+PIPEWEAVE_SECRET_KEY=a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6a7b8c9d0e1f2
+──────────────────────────────────────────────────
+
+Next Steps:
+1. Add these environment variables to your .env file
+2. Start the orchestrator: npm run dev:orchestrator
+3. Deploy your worker services with the same PIPEWEAVE_SECRET_KEY
+```
+
+**Features:**
+- ✅ Creates database schema from scratch
+- ✅ Creates dedicated database user with secure password
+- ✅ Grants all necessary permissions (tables, sequences, schemas)
+- ✅ Generates cryptographically secure passwords (32 characters)
+- ✅ Generates PipeWeave secret keys (64-character hex)
+- ✅ Copies credentials to clipboard automatically (macOS)
+- ✅ Runs all migrations automatically
+- ✅ Tests connection with new credentials
+- ✅ Idempotent (safe to run multiple times)
+
+**Security Notes:**
+- Admin credentials are only used during setup and are not stored
+- Generated passwords use a cryptographically secure random number generator
+- All credentials are displayed once and must be saved by the user
+- The setup command can safely update existing users' passwords
+
 ### Connection Management
 
 The interactive mode includes a comprehensive connection management system. When you launch `pipeweave` without arguments, you'll see:

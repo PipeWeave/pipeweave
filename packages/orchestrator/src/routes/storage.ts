@@ -1,4 +1,4 @@
-import type { Express } from 'express';
+import type { Application } from 'express';
 import type { OrchestratorRequest } from '../types/internal.js';
 import { createStorageProvider } from '@pipeweave/shared';
 
@@ -6,7 +6,7 @@ import { createStorageProvider } from '@pipeweave/shared';
 // Storage Routes
 // ============================================================================
 
-export function registerStorageRoutes(app: Express): void {
+export function registerStorageRoutes(app: Application): void {
   /**
    * GET /api/storage/backends
    * List all configured storage backends

@@ -1,5 +1,4 @@
-import { createOrchestrator } from '@pipeweave/orchestrator';
-import { createServer } from 'http';
+import { createOrchestrator } from "@pipeweave/orchestrator";
 
 // ============================================================================
 // Configuration
@@ -8,7 +7,8 @@ import { createServer } from 'http';
 const orchestrator = createOrchestrator({
   // Database connection (choose one method)
   // Method 1: Connection string
-  databaseUrl: process.env.DATABASE_URL ?? 'postgresql://localhost:5432/pipeweave',
+  databaseUrl:
+    process.env.DATABASE_URL ?? "postgresql://localhost:5432/pipeweave",
 
   // Method 2: Individual credentials (alternative to databaseUrl)
   // databaseConfig: {
@@ -25,12 +25,12 @@ const orchestrator = createOrchestrator({
   storageBackends: [
     // Local filesystem storage (for development)
     {
-      id: 'local-dev',
-      provider: 'local',
-      endpoint: 'file://',
-      bucket: 'data',
+      id: "local-dev",
+      provider: "local",
+      endpoint: "file://",
+      bucket: "data",
       credentials: {
-        basePath: './storage',
+        basePath: "./storage",
       },
       isDefault: true, // This will be the default storage backend
     },
@@ -73,16 +73,17 @@ const orchestrator = createOrchestrator({
 
   // Shared secret key for JWT encryption (REQUIRED)
   // Generate with: openssl rand -hex 32
-  secretKey: process.env.PIPEWEAVE_SECRET_KEY ?? 'dev-secret-key-change-in-production',
+  secretKey:
+    process.env.PIPEWEAVE_SECRET_KEY ?? "dev-secret-key-change-in-production",
 
   // Execution mode
-  mode: 'standalone', // or 'serverless' for Cloud Run, Lambda, etc.
+  mode: "standalone", // or 'serverless' for Cloud Run, Lambda, etc.
 
   // Maximum concurrent task executions
   maxConcurrency: 10,
 
   // Polling interval in ms (standalone mode only)
-  pollIntervalMs: 1000,
+  pollIntervalMs: 5000,
 
   // Dead Letter Queue retention in days
   dlqRetentionDays: 30,
@@ -93,11 +94,8 @@ const orchestrator = createOrchestrator({
   // Default max retry delay in ms
   maxRetryDelayMs: 86400000, // 24 hours
 
-  // Server port
-  port: 3000,
-
-  // Maintenance mode check interval in ms
-  maintenanceCheckIntervalMs: 5000,
+  // logging level
+  logLevel: "detailed",
 });
 
 // ============================================================================
@@ -115,49 +113,53 @@ async function main() {
 
     // Get maintenance status
     const maintenanceStatus = await orchestrator.getMaintenanceStatus();
-    console.log('[Example] Maintenance status:', maintenanceStatus);
+    console.log("[Example] Maintenance status:", maintenanceStatus);
 
     // List available storage backends
     const storageBackendIds = orchestrator.listStorageBackendIds();
-    console.log('[Example] Available storage backends:', storageBackendIds);
+    console.log("[Example] Available storage backends:", storageBackendIds);
 
     // Get default storage backend
     const defaultBackend = orchestrator.getDefaultStorageBackend();
-    console.log(`[Example] Default storage backend: ${defaultBackend.id} (${defaultBackend.provider})`);
+    console.log(
+      `[Example] Default storage backend: ${defaultBackend.id} (${defaultBackend.provider})`
+    );
 
-    // Start HTTP server to expose API endpoints
-    const server = createServer();
+    // Create HTTP server
+    const server = orchestrator.createServer();
 
-    server.listen(3000, () => {
-      console.log('[Example] Orchestrator HTTP server listening on port 3000');
-      console.log('[Example] API endpoints available:');
-      console.log('  - GET  /health                          - Health check');
-      console.log('  - POST /api/register                    - Worker registration');
-      console.log('  - GET  /api/services                    - List registered services');
-      console.log('  - POST /api/pipelines/:id/trigger       - Trigger a pipeline');
-      console.log('  - POST /api/queue/task                  - Queue a standalone task');
-      console.log('  - GET  /api/queue/status                - Get queue statistics');
-      console.log('  - POST /api/tick                        - Process tasks (serverless mode)');
-      console.log('  - GET  /api/dlq                         - List dead letter queue');
-      console.log('  - GET  /api/storage/backends            - List storage backends');
-    });
-
-    // Graceful shutdown
-    process.on('SIGINT', async () => {
-      console.log('\n[Example] Shutting down gracefully...');
-      server.close();
-      await orchestrator.stop();
-      process.exit(0);
-    });
-
-    process.on('SIGTERM', async () => {
-      console.log('\n[Example] Shutting down gracefully...');
-      server.close();
-      await orchestrator.stop();
-      process.exit(0);
+    // Start listening on port 3000
+    await server.listen(3000, () => {
+      console.log("[Example] Orchestrator HTTP server listening on port 3000");
+      console.log("[Example] API endpoints available:");
+      console.log("  - GET  /health                          - Health check");
+      console.log(
+        "  - POST /api/register                    - Worker registration"
+      );
+      console.log(
+        "  - GET  /api/services                    - List registered services"
+      );
+      console.log(
+        "  - POST /api/pipelines/:id/trigger       - Trigger a pipeline"
+      );
+      console.log(
+        "  - POST /api/queue/task                  - Queue a standalone task"
+      );
+      console.log(
+        "  - GET  /api/queue/status                - Get queue statistics"
+      );
+      console.log(
+        "  - POST /api/tick                        - Process tasks (serverless mode)"
+      );
+      console.log(
+        "  - GET  /api/dlq                         - List dead letter queue"
+      );
+      console.log(
+        "  - GET  /api/storage/backends            - List storage backends"
+      );
     });
   } catch (error) {
-    console.error('[Example] Failed to start orchestrator:', error);
+    console.error("[Example] Failed to start orchestrator:", error);
     process.exit(1);
   }
 }

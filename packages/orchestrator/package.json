@@ -5,9 +5,6 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "bin": {
-    "pipeweave-orchestrator": "./dist/bin/server.js"
-  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -20,8 +17,6 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "dev": "tsx watch src/bin/server.ts",
-    "start": "node dist/bin/server.js",
     "clean": "rm -rf dist",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext .ts",
@@ -35,7 +30,9 @@
     "@pipeweave/shared": "workspace:*",
     "chalk": "^5.3.0",
     "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
     "express": "^4.19.2",
+    "nanoid": "^5.0.0",
     "pg-promise": "^11.5.4",
     "winston": "^3.18.3",
     "zod": "^3.22.4"

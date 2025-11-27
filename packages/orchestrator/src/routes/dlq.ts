@@ -1,11 +1,11 @@
-import type { Express, RequestHandler } from 'express';
+import type { Application, RequestHandler } from 'express';
 import type { OrchestratorRequest } from '../types/internal.js';
 
 // ============================================================================
 // Dead Letter Queue Routes
 // ============================================================================
 
-export function registerDLQRoutes(app: Express): void {
+export function registerDLQRoutes(app: Application): void {
   /**
    * GET /api/dlq
    * List DLQ items (paginated, filtered)

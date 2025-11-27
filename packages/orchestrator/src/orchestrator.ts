@@ -1,3 +1,6 @@
+import express, { type Express } from 'express';
+import cors from 'cors';
+import type { Server } from 'http';
 import type { StorageBackendConfig } from '@pipeweave/shared';
 import { createDatabase, testConnection, closeDatabase, type Database, type DatabaseConfig } from './db/index.js';
 import {
@@ -7,10 +10,10 @@ import {
   enterMaintenance,
   exitMaintenance,
   canAcceptTasks,
-  checkMaintenanceTransition,
-  type OrchestratorMode,
   type MaintenanceStatus,
 } from './maintenance.js';
+import { registerRoutes } from './routes/index.js';
+import { TaskPoller } from './core/poller.js';
 import logger from './logger.js';
 
 // ============================================================================
@@ -40,10 +43,8 @@ export interface OrchestratorConfig {
   idempotencyTTLSeconds?: number;
   /** Default max retry delay in ms */
   maxRetryDelayMs?: number;
-  /** Server port */
-  port?: number;
-  /** Maintenance mode check interval in ms (default: 5000) */
-  maintenanceCheckIntervalMs?: number;
+  /** Logging level: 'minimal' (important only), 'normal' (default), 'detailed' (verbose) */
+  logLevel?: 'minimal' | 'normal' | 'detailed';
 }
 
 // ============================================================================
@@ -51,15 +52,18 @@ export interface OrchestratorConfig {
 // ============================================================================
 
 export class Orchestrator {
-  private config: Required<Omit<OrchestratorConfig, 'defaultStorageBackendId' | 'databaseUrl' | 'databaseConfig'>> & {
+  private config: Required<Omit<OrchestratorConfig, 'defaultStorageBackendId' | 'databaseUrl' | 'databaseConfig' | 'logLevel'>> & {
     defaultStorageBackendId: string;
     databaseUrl?: string;
     databaseConfig?: DatabaseConfig;
+    logLevel: 'minimal' | 'normal' | 'detailed';
   };
   private storageBackends: Map<string, StorageBackendConfig>;
   private defaultStorageBackend: StorageBackendConfig;
   private db: Database | null = null;
-  private maintenanceCheckInterval: NodeJS.Timeout | null = null;
+  private app: Express;
+  private server: Server | null = null;
+  private poller: TaskPoller | null = null;
 
   constructor(config: OrchestratorConfig) {
     if (!config.databaseUrl && !config.databaseConfig) {
@@ -108,9 +112,27 @@ export class Orchestrator {
       dlqRetentionDays: config.dlqRetentionDays ?? 30,
       idempotencyTTLSeconds: config.idempotencyTTLSeconds ?? 86400,
       maxRetryDelayMs: config.maxRetryDelayMs ?? 86400000,
-      port: config.port ?? 3000,
-      maintenanceCheckIntervalMs: config.maintenanceCheckIntervalMs ?? 5000,
+      logLevel: config.logLevel ?? 'normal',
     };
+
+    // Create Express app
+    this.app = express();
+
+    // Middleware
+    this.app.use(cors());
+    this.app.use(express.json({ limit: '10mb' }));
+    this.app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+    // Request logging (only in detailed mode)
+    if (this.config.logLevel === 'detailed' && !process.env.GCP_PROJECT_ID) {
+      this.app.use((req, _res, next) => {
+        logger.info(`[orchestrator] ${req.method} ${req.path}`);
+        next();
+      });
+    }
+
+    // Register all routes
+    registerRoutes(this.app, this);
   }
 
   /**
@@ -154,6 +176,13 @@ export class Orchestrator {
   }
 
   /**
+   * Get current log level
+   */
+  getLogLevel(): 'minimal' | 'normal' | 'detailed' {
+    return this.config.logLevel;
+  }
+
+  /**
    * Get current maintenance status
    */
   async getMaintenanceStatus(): Promise<MaintenanceStatus> {
@@ -190,10 +219,12 @@ export class Orchestrator {
   }
 
   async start(): Promise<void> {
-    logger.info(`[orchestrator] Orchestrator starting in ${this.config.mode} mode...`);
+    logger.info(`[orchestrator] Orchestrator starting in ${this.config.mode} mode (log level: ${this.config.logLevel})...`);
 
     // Initialize database connection
-    logger.info('[orchestrator] Connecting to database...');
+    if (this.config.logLevel !== 'minimal') {
+      logger.info('[orchestrator] Connecting to database...');
+    }
     try {
       if (this.config.databaseUrl) {
         this.db = createDatabase({ connectionString: this.config.databaseUrl });
@@ -206,82 +237,151 @@ export class Orchestrator {
       if (!connected) {
         throw new Error('Database connection test failed');
       }
-      logger.info('[orchestrator] Database connected successfully');
+      if (this.config.logLevel !== 'minimal') {
+        logger.info('[orchestrator] Database connected successfully');
+      }
 
       // Check maintenance mode status
       const state = await getOrchestratorState(this.db!);
-      logger.info(`[orchestrator] Orchestrator mode: ${state.mode}`);
+      if (this.config.logLevel === 'detailed') {
+        logger.info(`[orchestrator] Orchestrator mode: ${state.mode}`);
+      }
 
-      // Start maintenance mode checker (for auto-transition)
-      this.startMaintenanceChecker();
+      // Initialize poller (for both standalone and serverless modes)
+      this.poller = new TaskPoller(
+        this.db!,
+        this,
+        this.config.secretKey,
+        this.config.maxConcurrency,
+        this.config.pollIntervalMs,
+        'storage'
+      );
+
+      // Start poller loop only in standalone mode
+      if (this.config.mode === 'standalone') {
+        this.poller.start();
+        logger.info('[orchestrator] Task poller started');
+      }
     } catch (error) {
       logger.error('[orchestrator] Database initialization failed', { error });
       throw error;
     }
 
     // Display storage configuration
-    logger.info('[orchestrator] Configured storage backends:');
-    for (const backend of this.config.storageBackends) {
-      const isDefault = backend.id === this.config.defaultStorageBackendId;
-      logger.info(`[orchestrator]   • ${backend.id} (${backend.provider})${isDefault ? ' [default]' : ''}`);
-      logger.info(`[orchestrator]     Endpoint: ${backend.endpoint}`);
-      logger.info(`[orchestrator]     Bucket: ${backend.bucket}`);
+    if (this.config.logLevel === 'detailed') {
+      logger.info('[orchestrator] Configured storage backends:');
+      for (const backend of this.config.storageBackends) {
+        const isDefault = backend.id === this.config.defaultStorageBackendId;
+        logger.info(`[orchestrator]   • ${backend.id} (${backend.provider})${isDefault ? ' [default]' : ''}`);
+        logger.info(`[orchestrator]     Endpoint: ${backend.endpoint}`);
+        logger.info(`[orchestrator]     Bucket: ${backend.bucket}`);
+      }
+    } else if (this.config.logLevel === 'normal') {
+      const backendCount = this.config.storageBackends.length;
+      const defaultBackend = this.config.storageBackends.find(b => b.id === this.config.defaultStorageBackendId);
+      logger.info(`[orchestrator] Storage backends configured: ${backendCount} (default: ${defaultBackend?.id})`);
     }
 
     logger.info('[orchestrator] Orchestrator initialization complete');
-    logger.info('[orchestrator] Ready to accept requests');
+    if (this.config.logLevel !== 'minimal') {
+      logger.info('[orchestrator] Ready to accept requests');
+    }
   }
 
-  /**
-   * Start maintenance mode checker (runs periodically)
-   */
-  private startMaintenanceChecker(): void {
-    if (this.maintenanceCheckInterval) {
-      return; // Already running
-    }
-
-    this.maintenanceCheckInterval = setInterval(async () => {
-      try {
-        if (!this.db) return;
-
-        // Auto-transition to maintenance if waiting and all tasks complete
-        const transitioned = await checkMaintenanceTransition(this.db);
-        if (transitioned) {
-          logger.info('[orchestrator] Auto-transitioned to maintenance mode');
-        }
-      } catch (error) {
-        logger.error('[orchestrator] Error in maintenance checker', { error });
-      }
-    }, this.config.maintenanceCheckIntervalMs);
-
-    logger.info(`[orchestrator] Maintenance checker started (interval: ${this.config.maintenanceCheckIntervalMs}ms)`);
-  }
 
   /**
-   * Stop maintenance mode checker
+   * Create HTTP server interface
+   * Returns an object with listen() and stop() methods for controlling the HTTP server
    */
-  private stopMaintenanceChecker(): void {
-    if (this.maintenanceCheckInterval) {
-      clearInterval(this.maintenanceCheckInterval);
-      this.maintenanceCheckInterval = null;
-      logger.info('[orchestrator] Maintenance checker stopped');
-    }
+  createServer() {
+    const orchestrator = this;
+
+    // Graceful shutdown handlers
+    const shutdown = async (signal: string) => {
+      logger.info(`[orchestrator] Received ${signal}, shutting down gracefully...`);
+      await orchestrator.stop();
+      process.exit(0);
+    };
+
+    return {
+      /**
+       * Start HTTP server on specified port
+       */
+      listen: (port: number, callback?: () => void): Promise<void> => {
+        return new Promise((resolve, reject) => {
+          try {
+            orchestrator.server = orchestrator.app.listen(port, () => {
+              logger.info(`[orchestrator] HTTP server listening on port ${port}`);
+              logger.info('[orchestrator] Orchestrator ready');
+              if (callback) callback();
+              resolve();
+            });
+
+            orchestrator.server.on('error', (error) => {
+              logger.error('[orchestrator] Server error', { error });
+              reject(error);
+            });
+
+            // Setup graceful shutdown handlers
+            process.on('SIGTERM', () => shutdown('SIGTERM'));
+            process.on('SIGINT', () => shutdown('SIGINT'));
+          } catch (error) {
+            reject(error);
+          }
+        });
+      },
+
+      /**
+       * Stop HTTP server
+       */
+      stop: async (): Promise<void> => {
+        await orchestrator.stop();
+      },
+    };
   }
 
   async stop(): Promise<void> {
     logger.info('[orchestrator] Orchestrator stopping...');
 
-    // Stop maintenance checker
-    this.stopMaintenanceChecker();
+    // Stop poller
+    if (this.poller) {
+      this.poller.stop();
+      this.poller = null;
+      if (this.config.logLevel !== 'minimal') {
+        logger.info('[orchestrator] Task poller stopped');
+      }
+    }
+
+    // Close HTTP server
+    if (this.server) {
+      await new Promise<void>((resolve) => {
+        this.server!.close(() => {
+          if (this.config.logLevel !== 'minimal') {
+            logger.info('[orchestrator] HTTP server closed');
+          }
+          resolve();
+        });
+      });
+      this.server = null;
+    }
 
     // Close database connection
     if (this.db) {
-      logger.info('[orchestrator] Closing database connection...');
+      if (this.config.logLevel !== 'minimal') {
+        logger.info('[orchestrator] Closing database connection...');
+      }
       closeDatabase(this.db);
       this.db = null;
     }
 
     logger.info('[orchestrator] Orchestrator stopped');
+  }
+
+  /**
+   * Get poller instance (for serverless mode manual polling)
+   */
+  getPoller(): TaskPoller | null {
+    return this.poller;
   }
 }
 
@@ -293,102 +393,3 @@ export function createOrchestrator(config: OrchestratorConfig): Orchestrator {
   return new Orchestrator(config);
 }
 
-// ============================================================================
-// Environment Config Helper
-// ============================================================================
-
-export function createOrchestratorFromEnv(): Orchestrator {
-  const required = (name: string): string => {
-    const value = process.env[name];
-    if (!value) {
-      throw new Error(`Missing required environment variable: ${name}`);
-    }
-    return value;
-  };
-
-  const optional = <T>(name: string, defaultValue: T, parse?: (v: string) => T): T => {
-    const value = process.env[name];
-    if (!value) return defaultValue;
-    return parse ? parse(value) : (value as unknown as T);
-  };
-
-  // Parse database configuration
-  let databaseUrl: string | undefined;
-  let databaseConfig: DatabaseConfig | undefined;
-
-  if (process.env.DATABASE_URL) {
-    // Primary method: connection string
-    databaseUrl = process.env.DATABASE_URL;
-  } else {
-    // Alternative method: individual credentials
-    const host = process.env.DB_HOST;
-    const database = process.env.DB_NAME || process.env.DB_DATABASE;
-    const user = process.env.DB_USER || process.env.DB_USERNAME;
-    const password = process.env.DB_PASS || process.env.DB_PASSWORD;
-    const port = process.env.DB_PORT ? parseInt(process.env.DB_PORT) : 5432;
-
-    if (host && database && user) {
-      // Determine SSL configuration
-      let ssl: boolean | { rejectUnauthorized: boolean } | undefined;
-
-      if (process.env.NODE_ENV === 'production') {
-        // Production with Cloud SQL Unix socket - no SSL needed
-        if (host.startsWith('/cloudsql/')) {
-          ssl = undefined;
-        } else {
-          // Remote connection - use SSL with relaxed validation
-          ssl = { rejectUnauthorized: false };
-        }
-      } else {
-        // Local development - use SSL if explicitly enabled
-        ssl = process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : undefined;
-      }
-
-      databaseConfig = {
-        host,
-        port,
-        database,
-        user,
-        password,
-        ssl,
-        max: optional('DB_POOL_MAX', 10, parseInt),
-        allowExitOnIdle: optional('DB_ALLOW_EXIT_ON_IDLE', false, (v) => v === 'true'),
-      };
-    }
-  }
-
-  if (!databaseUrl && !databaseConfig) {
-    throw new Error(
-      'Missing database configuration: set DATABASE_URL or (DB_HOST, DB_NAME, DB_USER)'
-    );
-  }
-
-  // Parse storage backends from STORAGE_BACKENDS JSON
-  let storageBackends: StorageBackendConfig[];
-
-  if (!process.env.STORAGE_BACKENDS) {
-    throw new Error('STORAGE_BACKENDS environment variable is required');
-  }
-
-  try {
-    storageBackends = JSON.parse(process.env.STORAGE_BACKENDS);
-  } catch (error) {
-    throw new Error('Invalid STORAGE_BACKENDS JSON: ' + error);
-  }
-
-  return createOrchestrator({
-    databaseUrl,
-    databaseConfig,
-    storageBackends,
-    defaultStorageBackendId: process.env.DEFAULT_STORAGE_BACKEND_ID,
-    secretKey: required('PIPEWEAVE_SECRET_KEY'),
-    mode: optional('MODE', 'standalone') as 'standalone' | 'serverless',
-    maxConcurrency: optional('MAX_CONCURRENCY', 10, parseInt),
-    pollIntervalMs: optional('POLL_INTERVAL_MS', 1000, parseInt),
-    dlqRetentionDays: optional('DLQ_RETENTION_DAYS', 30, parseInt),
-    idempotencyTTLSeconds: optional('IDEMPOTENCY_TTL_SECONDS', 86400, parseInt),
-    maxRetryDelayMs: optional('MAX_RETRY_DELAY_MS', 86400000, parseInt),
-    port: optional('PORT', 3000, parseInt),
-    maintenanceCheckIntervalMs: optional('MAINTENANCE_CHECK_INTERVAL_MS', 5000, parseInt),
-  });
-}

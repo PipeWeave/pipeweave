@@ -19,8 +19,8 @@ CREATE TABLE IF NOT EXISTS services (
   metadata JSONB DEFAULT '{}'::jsonb
 );
 
-CREATE INDEX idx_services_status ON services(status);
-CREATE INDEX idx_services_last_heartbeat ON services(last_heartbeat);
+CREATE INDEX IF NOT EXISTS idx_services_status ON services(status);
+CREATE INDEX IF NOT EXISTS idx_services_last_heartbeat ON services(last_heartbeat);
 
 -- ============================================================================
 -- Tasks Table
@@ -47,9 +47,9 @@ CREATE TABLE IF NOT EXISTS tasks (
   metadata JSONB DEFAULT '{}'::jsonb
 );
 
-CREATE INDEX idx_tasks_service_id ON tasks(service_id);
-CREATE INDEX idx_tasks_code_hash ON tasks(code_hash);
-CREATE INDEX idx_tasks_code_version ON tasks(code_version);
+CREATE INDEX IF NOT EXISTS idx_tasks_service_id ON tasks(service_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_code_hash ON tasks(code_hash);
+CREATE INDEX IF NOT EXISTS idx_tasks_code_version ON tasks(code_version);
 
 -- ============================================================================
 -- Task Code History Table
@@ -64,8 +64,8 @@ CREATE TABLE IF NOT EXISTS task_code_history (
   recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_task_code_history_task_id ON task_code_history(task_id);
-CREATE INDEX idx_task_code_history_code_version ON task_code_history(task_id, code_version DESC);
+CREATE INDEX IF NOT EXISTS idx_task_code_history_task_id ON task_code_history(task_id);
+CREATE INDEX IF NOT EXISTS idx_task_code_history_code_version ON task_code_history(task_id, code_version DESC);
 
 -- ============================================================================
 -- Pipelines Table
@@ -84,7 +84,7 @@ CREATE TABLE IF NOT EXISTS pipelines (
   metadata JSONB DEFAULT '{}'::jsonb
 );
 
-CREATE INDEX idx_pipelines_name ON pipelines(name);
+CREATE INDEX IF NOT EXISTS idx_pipelines_name ON pipelines(name);
 
 -- ============================================================================
 -- Pipeline Runs Table
@@ -105,9 +105,9 @@ CREATE TABLE IF NOT EXISTS pipeline_runs (
   metadata JSONB DEFAULT '{}'::jsonb
 );
 
-CREATE INDEX idx_pipeline_runs_pipeline_id ON pipeline_runs(pipeline_id);
-CREATE INDEX idx_pipeline_runs_status ON pipeline_runs(status);
-CREATE INDEX idx_pipeline_runs_created_at ON pipeline_runs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_pipeline_runs_pipeline_id ON pipeline_runs(pipeline_id);
+CREATE INDEX IF NOT EXISTS idx_pipeline_runs_status ON pipeline_runs(status);
+CREATE INDEX IF NOT EXISTS idx_pipeline_runs_created_at ON pipeline_runs(created_at DESC);
 
 -- ============================================================================
 -- Task Runs Table
@@ -143,13 +143,13 @@ CREATE TABLE IF NOT EXISTS task_runs (
   metadata JSONB DEFAULT '{}'::jsonb
 );
 
-CREATE INDEX idx_task_runs_task_id ON task_runs(task_id);
-CREATE INDEX idx_task_runs_pipeline_run_id ON task_runs(pipeline_run_id);
-CREATE INDEX idx_task_runs_status ON task_runs(status);
-CREATE INDEX idx_task_runs_idempotency_key ON task_runs(idempotency_key) WHERE idempotency_key IS NOT NULL;
-CREATE INDEX idx_task_runs_scheduled_for ON task_runs(scheduled_for) WHERE scheduled_for IS NOT NULL;
-CREATE INDEX idx_task_runs_created_at ON task_runs(created_at DESC);
-CREATE INDEX idx_task_runs_pending ON task_runs(priority, created_at) WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_task_runs_task_id ON task_runs(task_id);
+CREATE INDEX IF NOT EXISTS idx_task_runs_pipeline_run_id ON task_runs(pipeline_run_id);
+CREATE INDEX IF NOT EXISTS idx_task_runs_status ON task_runs(status);
+CREATE INDEX IF NOT EXISTS idx_task_runs_idempotency_key ON task_runs(idempotency_key) WHERE idempotency_key IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_task_runs_scheduled_for ON task_runs(scheduled_for) WHERE scheduled_for IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_task_runs_created_at ON task_runs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_task_runs_pending ON task_runs(priority, created_at) WHERE status = 'pending';
 
 -- ============================================================================
 -- Dead Letter Queue Table
@@ -173,10 +173,10 @@ CREATE TABLE IF NOT EXISTS dlq (
   metadata JSONB DEFAULT '{}'::jsonb
 );
 
-CREATE INDEX idx_dlq_task_id ON dlq(task_id);
-CREATE INDEX idx_dlq_pipeline_run_id ON dlq(pipeline_run_id);
-CREATE INDEX idx_dlq_failed_at ON dlq(failed_at DESC);
-CREATE INDEX idx_dlq_retried_at ON dlq(retried_at) WHERE retried_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_dlq_task_id ON dlq(task_id);
+CREATE INDEX IF NOT EXISTS idx_dlq_pipeline_run_id ON dlq(pipeline_run_id);
+CREATE INDEX IF NOT EXISTS idx_dlq_failed_at ON dlq(failed_at DESC);
+CREATE INDEX IF NOT EXISTS idx_dlq_retried_at ON dlq(retried_at) WHERE retried_at IS NOT NULL;
 
 -- ============================================================================
 -- Idempotency Cache Table
@@ -194,8 +194,8 @@ CREATE TABLE IF NOT EXISTS idempotency_cache (
   expires_at TIMESTAMPTZ NOT NULL
 );
 
-CREATE INDEX idx_idempotency_cache_task_id ON idempotency_cache(task_id);
-CREATE INDEX idx_idempotency_cache_expires_at ON idempotency_cache(expires_at);
+CREATE INDEX IF NOT EXISTS idx_idempotency_cache_task_id ON idempotency_cache(task_id);
+CREATE INDEX IF NOT EXISTS idx_idempotency_cache_expires_at ON idempotency_cache(expires_at);
 
 -- ============================================================================
 -- Functions & Triggers
@@ -210,9 +210,11 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
+DROP TRIGGER IF EXISTS update_tasks_updated_at ON tasks;
 CREATE TRIGGER update_tasks_updated_at BEFORE UPDATE ON tasks
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_pipelines_updated_at ON pipelines;
 CREATE TRIGGER update_pipelines_updated_at BEFORE UPDATE ON pipelines
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 

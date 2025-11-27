@@ -1,11 +1,11 @@
-import type { Express } from 'express';
+import type { Application } from 'express';
 import type { OrchestratorRequest } from '../types/internal.js';
 
 // ============================================================================
 // Run Query Routes
 // ============================================================================
 
-export function registerRunRoutes(app: Express): void {
+export function registerRunRoutes(app: Application): void {
   /**
    * GET /api/runs
    * List pipeline runs (paginated, filtered)

@@ -80,23 +80,22 @@ export function registerQueueRoutes(app: Express): void {
   app.post('/api/tick', async (req, res) => {
     try {
       const orchestrator = (req as OrchestratorRequest).orchestrator;
-      const config = (orchestrator as any).config;
 
-      // Check if in maintenance mode
-      const canAccept = await orchestrator.canAcceptTasks();
-      if (!canAccept) {
+      // Get poller instance
+      const poller = orchestrator.getPoller();
+      if (!poller) {
         return res.status(503).json({
-          error: 'Orchestrator in maintenance mode',
+          error: 'Poller not available',
           processed: 0,
         });
       }
 
-      // TODO: Implement task processing
-      // For now, just acknowledge the tick
+      // Trigger manual poll
+      const processed = await poller.manualPoll();
+
       return res.json({
         status: 'ok',
-        mode: config.mode,
-        processed: 0,
+        processed,
         timestamp: new Date().toISOString(),
       });
     } catch (error) {
