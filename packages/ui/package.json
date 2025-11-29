@@ -1,7 +1,6 @@
 {
   "name": "@pipeweave/ui",
   "version": "0.1.0",
-  "private": true,
   "description": "PipeWeave Web UI - Monitoring dashboard",
   "scripts": {
     "dev": "next dev -p 4000",

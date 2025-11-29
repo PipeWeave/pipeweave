@@ -44,6 +44,12 @@
       "optional": true
     }
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SaritraGmbH/pipeweave.git",
+    "directory": "sdks/nodejs"
+  },
+  "homepage": "https://github.com/SaritraGmbH/pipeweave#readme",
   "publishConfig": {
     "access": "public"
   },

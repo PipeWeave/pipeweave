@@ -204,13 +204,13 @@ worker.register("summarize", async (ctx) => {
 
 ## Packages
 
-| Package                                            | Description                |
-| -------------------------------------------------- | -------------------------- |
-| [@pipeweave/sdk](./sdks/nodejs)                    | Worker SDK for Node.js     |
-| [@pipeweave/orchestrator](./packages/orchestrator) | Task execution engine      |
-| [@pipeweave/cli](./packages/cli)                   | Command line interface     |
-| [@pipeweave/ui](./packages/ui)                     | Web monitoring dashboard   |
-| [@pipeweave/shared](./packages/shared)             | Shared types and utilities |
+| Package | Version | Description |
+| ------- | ------- | ----------- |
+| [@pipeweave/sdk](./sdks/nodejs) | [![npm](https://img.shields.io/npm/v/@pipeweave/sdk)](https://www.npmjs.com/package/@pipeweave/sdk) | Worker SDK for Node.js |
+| [@pipeweave/orchestrator](./packages/orchestrator) | [![npm](https://img.shields.io/npm/v/@pipeweave/orchestrator)](https://www.npmjs.com/package/@pipeweave/orchestrator) | Task execution engine |
+| [@pipeweave/cli](./packages/cli) | [![npm](https://img.shields.io/npm/v/@pipeweave/cli)](https://www.npmjs.com/package/@pipeweave/cli) | Command line interface |
+| [@pipeweave/ui](./packages/ui) | - | Web monitoring dashboard |
+| [@pipeweave/shared](./packages/shared) | [![npm](https://img.shields.io/npm/v/@pipeweave/shared)](https://www.npmjs.com/package/@pipeweave/shared) | Shared types and utilities |
 
 ## Features
 
@@ -362,7 +362,7 @@ See more examples in the [Examples Guide](./docs/examples.md).
 
 ```bash
 # Clone repository
-git clone https://github.com/pipeweave/pipeweave.git
+git clone https://github.com/SaritraGmbH/pipeweave.git
 cd pipeweave
 
 # Install and build
@@ -471,4 +471,4 @@ MIT © PipeWeave Contributors
 
 **Ready to get started?** → [Getting Started Guide](./docs/getting-started.md)
 
-**Need help?** → [GitHub Issues](https://github.com/pipeweave/pipeweave/issues)
+**Need help?** → [GitHub Issues](https://github.com/SaritraGmbH/pipeweave/issues)
