@@ -32,6 +32,24 @@ PipeWeave lets you build reliable, observable workflows that are **easy to debug
 - **🔄 Built-in reliability** — Automatic retries, heartbeat monitoring, and dead letter queues
 - **📊 Observable by default** — Track every task execution, view logs, and monitor pipeline health
 
+## Documentation
+
+- **[Getting Started](./docs/getting-started.md)** — Complete setup guide from zero to production
+- **[Architecture](./docs/architecture.md)** — How PipeWeave works under the hood
+- **[Configuration](./docs/configuration.md)** — Environment variables and tuning options
+- **[Examples](./docs/examples.md)** — Real-world patterns and code samples
+- **[API Reference](./SPEC.md)** — Complete API specification
+
+## Packages
+
+| Package                                            | Version                                                                                                               | Description                |
+| -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | -------------------------- |
+| [@pipeweave/sdk](./sdks/nodejs)                    | [![npm](https://img.shields.io/npm/v/@pipeweave/sdk)](https://www.npmjs.com/package/@pipeweave/sdk)                   | Worker SDK for Node.js     |
+| [@pipeweave/orchestrator](./packages/orchestrator) | [![npm](https://img.shields.io/npm/v/@pipeweave/orchestrator)](https://www.npmjs.com/package/@pipeweave/orchestrator) | Task execution engine      |
+| [@pipeweave/cli](./packages/cli)                   | [![npm](https://img.shields.io/npm/v/@pipeweave/cli)](https://www.npmjs.com/package/@pipeweave/cli)                   | Command line interface     |
+| [@pipeweave/ui](./packages/ui)                     | [![npm](https://img.shields.io/npm/v/@pipeweave/ui)](https://www.npmjs.com/package/@pipeweave/ui)                     | Web monitoring dashboard   |
+| [@pipeweave/shared](./packages/shared)             | [![npm](https://img.shields.io/npm/v/@pipeweave/shared)](https://www.npmjs.com/package/@pipeweave/shared)             | Shared types and utilities |
+
 ## Quick Start
 
 ### 1. Install
@@ -193,24 +211,6 @@ worker.register("summarize", async (ctx) => {
   };
 });
 ```
-
-## Documentation
-
-- **[Getting Started](./docs/getting-started.md)** — Complete setup guide from zero to production
-- **[Architecture](./docs/architecture.md)** — How PipeWeave works under the hood
-- **[Configuration](./docs/configuration.md)** — Environment variables and tuning options
-- **[Examples](./docs/examples.md)** — Real-world patterns and code samples
-- **[API Reference](./SPEC.md)** — Complete API specification
-
-## Packages
-
-| Package | Version | Description |
-| ------- | ------- | ----------- |
-| [@pipeweave/sdk](./sdks/nodejs) | [![npm](https://img.shields.io/npm/v/@pipeweave/sdk)](https://www.npmjs.com/package/@pipeweave/sdk) | Worker SDK for Node.js |
-| [@pipeweave/orchestrator](./packages/orchestrator) | [![npm](https://img.shields.io/npm/v/@pipeweave/orchestrator)](https://www.npmjs.com/package/@pipeweave/orchestrator) | Task execution engine |
-| [@pipeweave/cli](./packages/cli) | [![npm](https://img.shields.io/npm/v/@pipeweave/cli)](https://www.npmjs.com/package/@pipeweave/cli) | Command line interface |
-| [@pipeweave/ui](./packages/ui) | - | Web monitoring dashboard |
-| [@pipeweave/shared](./packages/shared) | [![npm](https://img.shields.io/npm/v/@pipeweave/shared)](https://www.npmjs.com/package/@pipeweave/shared) | Shared types and utilities |
 
 ## Features
 
