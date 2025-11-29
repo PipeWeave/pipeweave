@@ -1,6 +1,6 @@
 {
   "name": "orchestrator-setup-example",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Example demonstrating how to set up and use the PipeWeave orchestrator",
   "type": "module",
   "scripts": {

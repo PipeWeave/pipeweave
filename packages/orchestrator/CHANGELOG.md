@@ -1,5 +1,16 @@
 # Changelog - Database & Maintenance Mode Implementation
 
+## 1.0.0
+
+### Major Changes
+
+- 52bf545: first inital realease of pipeweave
+
+### Patch Changes
+
+- Updated dependencies [52bf545]
+  - @pipeweave/shared@1.0.0
+
 ## Summary
 
 Implemented comprehensive database migration system and maintenance mode functionality for the PipeWeave orchestrator.
@@ -15,6 +26,7 @@ Implemented comprehensive database migration system and maintenance mode functio
 - **Auto-migration** option for development (not recommended for production)
 
 **Files Created:**
+
 - `src/db/migrations/000_migration_tracking.sql` - Migration tracking & orchestrator state tables
 - `src/db/migrations/001_initial_schema.sql` - Initial database schema
 - `src/db/migration-runner.ts` - Migration discovery, validation, and execution
@@ -28,11 +40,13 @@ Implemented comprehensive database migration system and maintenance mode functio
 - **CLI commands** for maintenance mode control
 
 **States:**
+
 1. **running** - Normal operation, accepting new tasks
 2. **waiting_for_maintenance** - Draining tasks, no new tasks accepted
 3. **maintenance** - Safe for migrations, no tasks running
 
 **Files Created:**
+
 - `src/maintenance.ts` - Maintenance mode state management
 - `src/db/migrations/000_migration_tracking.sql` - Orchestrator state table
 
@@ -41,6 +55,7 @@ Implemented comprehensive database migration system and maintenance mode functio
 New `pipeweave` CLI with commands for both migrations and maintenance:
 
 **Migration Commands:**
+
 ```bash
 pipeweave db:migrate      # Run pending migrations
 pipeweave db:status       # Show migration status
@@ -49,6 +64,7 @@ pipeweave db:cleanup      # Cleanup expired cache/DLQ
 ```
 
 **Maintenance Commands:**
+
 ```bash
 pipeweave maintenance:status   # Show maintenance status
 pipeweave maintenance:request  # Request maintenance mode
@@ -57,30 +73,34 @@ pipeweave maintenance:exit     # Exit maintenance mode
 ```
 
 **Files Created:**
+
 - `src/bin/pipeweave-cli.ts` - New unified CLI
 
 ### 🔧 Orchestrator Updates
 
 **Enhanced Configuration:**
+
 ```typescript
 interface OrchestratorConfig {
   // ... existing config
-  autoMigrate?: boolean;                  // Auto-run migrations (default: false)
-  maintenanceCheckIntervalMs?: number;    // Check interval (default: 5000ms)
+  autoMigrate?: boolean; // Auto-run migrations (default: false)
+  maintenanceCheckIntervalMs?: number; // Check interval (default: 5000ms)
 }
 ```
 
 **New Methods:**
+
 ```typescript
 // Maintenance mode methods
-orchestrator.getMaintenanceStatus()
-orchestrator.requestMaintenance()
-orchestrator.enterMaintenance()
-orchestrator.exitMaintenance()
-orchestrator.canAcceptTasks()
+orchestrator.getMaintenanceStatus();
+orchestrator.requestMaintenance();
+orchestrator.enterMaintenance();
+orchestrator.exitMaintenance();
+orchestrator.canAcceptTasks();
 ```
 
 **Auto-Features:**
+
 - Runs migrations on startup if `autoMigrate: true`
 - Displays current maintenance mode on startup
 - Background checker for auto-transition every 5 seconds
@@ -89,6 +109,7 @@ orchestrator.canAcceptTasks()
 ### 📚 Documentation
 
 **New Documents:**
+
 - `MIGRATIONS_AND_MAINTENANCE.md` - Complete guide for migrations and maintenance mode
 - Updated `DATABASE.md` - Database setup with migration instructions
 - Updated `EXAMPLE_USAGE.md` - Added migration and maintenance examples
@@ -98,7 +119,9 @@ orchestrator.canAcceptTasks()
 ### New Tables
 
 #### `schema_migrations`
+
 Tracks applied migrations:
+
 - `version` - Migration version number
 - `name` - Migration name
 - `checksum` - SHA-256 hash for validation
@@ -106,7 +129,9 @@ Tracks applied migrations:
 - `execution_time_ms` - How long it took
 
 #### `orchestrator_state`
+
 Tracks orchestrator operational state:
+
 - `mode` - Current mode (running/waiting_for_maintenance/maintenance)
 - `pending_tasks_count` - Number of pending tasks
 - `running_tasks_count` - Number of running tasks
@@ -115,9 +140,11 @@ Tracks orchestrator operational state:
 ### Updated Schema
 
 The main schema SQL was moved from:
+
 - `src/db/schema.sql` (deprecated, kept for reference)
 
 To versioned migrations:
+
 - `src/db/migrations/000_migration_tracking.sql`
 - `src/db/migrations/001_initial_schema.sql`
 
@@ -126,16 +153,19 @@ To versioned migrations:
 ### ⚠️ Database Initialization
 
 **Before:**
+
 ```bash
 pipeweave-db init
 ```
 
 **After:**
+
 ```bash
 pipeweave db:migrate
 ```
 
 **Migration Path:**
+
 1. Old `init` command still works but is deprecated
 2. New deployments should use `pipeweave db:migrate`
 3. Auto-migration via `AUTO_MIGRATE=true` (dev only)
@@ -143,9 +173,11 @@ pipeweave db:migrate
 ### ⚠️ Environment Variables
 
 **Removed:**
+
 - `AUTO_INIT_DB` (replaced with `AUTO_MIGRATE`)
 
 **Added:**
+
 - `AUTO_MIGRATE` - Auto-run migrations on startup
 - `MAINTENANCE_CHECK_INTERVAL_MS` - Auto-transition check interval
 
@@ -199,7 +231,7 @@ pipeweave maintenance:exit
 ### Programmatic Usage
 
 ```typescript
-import { createOrchestrator } from '@pipeweave/orchestrator';
+import { createOrchestrator } from "@pipeweave/orchestrator";
 
 const orchestrator = createOrchestrator({
   databaseUrl: process.env.DATABASE_URL,
@@ -215,7 +247,7 @@ await orchestrator.requestMaintenance();
 
 // Wait for auto-transition
 const status = await orchestrator.getMaintenanceStatus();
-if (status.mode === 'maintenance') {
+if (status.mode === "maintenance") {
   // Safe to run migrations
 }
 
@@ -226,6 +258,7 @@ await orchestrator.exitMaintenance();
 ## Files Added/Modified
 
 ### Added Files
+
 ```
 src/db/migrations/
   000_migration_tracking.sql      - Migration tracking & orchestrator state
@@ -240,6 +273,7 @@ CHANGELOG.md                       - This file
 ```
 
 ### Modified Files
+
 ```
 src/orchestrator.ts               - Added maintenance mode integration
 src/index.ts                      - Added new exports
@@ -255,11 +289,13 @@ package.json                      - Added 'pipeweave' CLI entry
 **If you previously used `pipeweave-db init`:**
 
 1. **Backup your database**
+
    ```bash
    pg_dump $DATABASE_URL > backup.sql
    ```
 
 2. **Run migrations**
+
    ```bash
    pipeweave db:migrate
    ```
@@ -272,6 +308,7 @@ package.json                      - Added 'pipeweave' CLI entry
 **If starting fresh:**
 
 Just run:
+
 ```bash
 pipeweave db:migrate
 ```
@@ -305,7 +342,7 @@ export {
   getMigrationStatus,
   validateMigrations,
   discoverMigrations,
-} from '@pipeweave/orchestrator';
+} from "@pipeweave/orchestrator";
 
 // Maintenance Mode
 export {
@@ -316,7 +353,7 @@ export {
   exitMaintenance,
   canAcceptTasks,
   checkMaintenanceTransition,
-} from '@pipeweave/orchestrator';
+} from "@pipeweave/orchestrator";
 
 // Types
 export type {
@@ -326,7 +363,7 @@ export type {
   OrchestratorMode,
   OrchestratorState,
   MaintenanceStatus,
-} from '@pipeweave/orchestrator';
+} from "@pipeweave/orchestrator";
 ```
 
 ### Orchestrator Methods
