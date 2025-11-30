@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { TaskInputSchema } from './input-schema.js';
 
 // ============================================================================
 // Task Status
@@ -122,6 +123,8 @@ export interface TaskOptions {
   idempotencyTTL?: number;
   /** Human-readable description */
   description?: string;
+  /** Input schema for UI form generation and validation (optional) */
+  inputSchema?: TaskInputSchema;
 }
 
 export const TaskOptionsSchema = z.object({

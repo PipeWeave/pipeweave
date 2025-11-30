@@ -4,7 +4,12 @@ import { RetryManager } from '../core/retry-manager.js';
 import { DLQManager } from '../core/dlq-manager.js';
 import { IdempotencyManager } from '../core/idempotency.js';
 import { PipelineExecutor } from '../pipeline/executor.js';
-import { HeartbeatRequestSchema, TaskCallbackPayloadSchema } from '@pipeweave/shared';
+import {
+  HeartbeatRequestSchema,
+  TaskCallbackPayloadSchema,
+  validateInput,
+  type TaskInputSchema,
+} from '@pipeweave/shared';
 import logger from '../logger.js';
 
 // ============================================================================
@@ -312,6 +317,88 @@ export function registerTaskRoutes(app: Express): void {
       logger.error('[tasks] Failed to get task history', { error });
       return res.status(500).json({
         error: 'Failed to get task history',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  /**
+   * GET /api/tasks/:id/input-schema
+   * Get input schema for a task
+   */
+  app.get('/api/tasks/:id/input-schema', async (req: Request, res: Response) => {
+    const orchestratorReq = req as OrchestratorRequest;
+    try {
+      const { id } = req.params;
+      if (!id) {
+        return res.status(400).json({ error: 'Task ID is required' });
+      }
+      const orchestrator = orchestratorReq.orchestrator;
+      const db = orchestrator.getDatabase();
+
+      const task = await db.oneOrNone<{ input_schema: TaskInputSchema | null }>(
+        'SELECT input_schema FROM tasks WHERE id = $1',
+        [id]
+      );
+
+      if (!task) {
+        return res.status(404).json({ error: 'Task not found' });
+      }
+
+      return res.json({
+        taskId: id,
+        hasSchema: !!task.input_schema,
+        schema: task.input_schema || null,
+      });
+    } catch (error) {
+      logger.error('[tasks] Failed to get input schema', { error });
+      return res.status(500).json({
+        error: 'Failed to get input schema',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  /**
+   * POST /api/tasks/:id/validate-input
+   * Validate input against task schema without executing
+   */
+  app.post('/api/tasks/:id/validate-input', async (req: Request, res: Response) => {
+    const orchestratorReq = req as OrchestratorRequest;
+    try {
+      const { id } = req.params;
+      if (!id) {
+        return res.status(400).json({ error: 'Task ID is required' });
+      }
+
+      const { input } = req.body;
+      if (input === undefined) {
+        return res.status(400).json({ error: 'Input is required' });
+      }
+
+      const orchestrator = orchestratorReq.orchestrator;
+      const db = orchestrator.getDatabase();
+
+      const task = await db.oneOrNone<{ input_schema: TaskInputSchema | null }>(
+        'SELECT input_schema FROM tasks WHERE id = $1',
+        [id]
+      );
+
+      if (!task) {
+        return res.status(404).json({ error: 'Task not found' });
+      }
+
+      // Validate input (returns valid=true if no schema)
+      const result = validateInput(input, task.input_schema || undefined);
+
+      return res.json({
+        valid: result.valid,
+        errors: result.errors,
+      });
+    } catch (error) {
+      logger.error('[tasks] Failed to validate input', { error });
+      return res.status(500).json({
+        error: 'Failed to validate input',
         message: error instanceof Error ? error.message : 'Unknown error',
       });
     }

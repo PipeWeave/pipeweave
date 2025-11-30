@@ -96,6 +96,7 @@ export class Worker {
         | undefined,
       idempotencyTTL: options.idempotencyTTL ?? DEFAULTS.IDEMPOTENCY_TTL,
       description: options.description,
+      inputSchema: options.inputSchema, // Pass through input schema
     };
 
     this.tasks.set(id, {
@@ -179,6 +180,7 @@ export class Worker {
       priority: task.options.priority,
       idempotencyTTL: task.options.idempotencyTTL,
       description: task.options.description,
+      inputSchema: task.options.inputSchema, // Include input schema in registration
     }));
 
     try {

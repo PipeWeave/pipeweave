@@ -14,6 +14,8 @@ import {
 } from './maintenance.js';
 import { registerRoutes } from './routes/index.js';
 import { TaskPoller } from './core/poller.js';
+import { TempUploadCleanupService } from './cleanup/temp-upload-cleanup.js';
+import { createStorageProvider } from '@pipeweave/shared';
 import logger from './logger.js';
 
 // ============================================================================
@@ -64,6 +66,7 @@ export class Orchestrator {
   private app: Express;
   private server: Server | null = null;
   private poller: TaskPoller | null = null;
+  private tempUploadCleanup: TempUploadCleanupService | null = null;
 
   constructor(config: OrchestratorConfig) {
     if (!config.databaseUrl && !config.databaseConfig) {
@@ -262,6 +265,26 @@ export class Orchestrator {
         this.poller.start();
         logger.info('[orchestrator] Task poller started');
       }
+
+      // Initialize temp upload cleanup service
+      this.tempUploadCleanup = new TempUploadCleanupService(
+        this.db!,
+        (id: string) => {
+          const backend = this.getStorageBackend(id);
+          return createStorageProvider(backend);
+        },
+        logger,
+        {
+          intervalMs: 60 * 60 * 1000, // 1 hour
+          archiveAfterDays: 30,
+        }
+      );
+
+      // Start cleanup service in standalone mode
+      if (this.config.mode === 'standalone') {
+        this.tempUploadCleanup.start();
+        logger.info('[orchestrator] Temp upload cleanup service started');
+      }
     } catch (error) {
       logger.error('[orchestrator] Database initialization failed', { error });
       throw error;
@@ -347,6 +370,12 @@ export class Orchestrator {
     if (this.poller) {
       this.poller.stop();
       this.poller = null;
+    }
+
+    // Stop temp upload cleanup service
+    if (this.tempUploadCleanup) {
+      this.tempUploadCleanup.stop();
+      this.tempUploadCleanup = null;
       if (this.config.logLevel !== 'minimal') {
         logger.info('[orchestrator] Task poller stopped');
       }

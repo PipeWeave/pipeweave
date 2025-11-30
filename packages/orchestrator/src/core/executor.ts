@@ -4,7 +4,7 @@ import type { PendingTask } from './queue-manager.js';
 import type { RegisteredTask } from './registry.js';
 import { ServiceRegistry } from './registry.js';
 import { encryptStorageToken } from '../storage/jwt.js';
-import type { TaskDispatchPayload } from '@pipeweave/shared';
+import { extractTempUploadIds, type TaskDispatchPayload } from '@pipeweave/shared';
 import logger from '../logger.js';
 
 // ============================================================================
@@ -70,6 +70,9 @@ export class TaskExecutor {
          WHERE id = $1`,
         [runId]
       );
+
+      // Claim any temporary uploads referenced in the input
+      await this.claimTempUploads(runId, queueItem.inputPath);
 
       logger.info(`[executor] Task ${taskId} dispatched successfully (runId: ${runId})`);
     } catch (error) {
@@ -140,5 +143,42 @@ export class TaskExecutor {
 
     // upstreamRefs already contains the necessary info from queueing
     return queueItem.upstreamRefs;
+  }
+
+  /**
+   * Claim temporary uploads referenced in task input
+   * This prevents them from being auto-deleted
+   */
+  private async claimTempUploads(runId: string, inputPath: string): Promise<void> {
+    try {
+      // Get input data from storage
+      const storage = this.orchestrator.getDefaultStorageBackend();
+      const { createStorageProvider } = await import('@pipeweave/shared');
+      const provider = createStorageProvider(storage);
+
+      const inputData = await provider.download(inputPath);
+
+      // Extract temp upload IDs from input
+      const uploadIds = extractTempUploadIds(inputData);
+
+      if (uploadIds.length > 0) {
+        // Claim all uploads by setting claimed_by_run_id
+        await this.db.none(
+          `UPDATE temp_uploads
+           SET claimed_by_run_id = $1
+           WHERE id = ANY($2) AND claimed_by_run_id IS NULL`,
+          [runId, uploadIds]
+        );
+
+        logger.info(`[executor] Claimed ${uploadIds.length} temp uploads for run ${runId}`);
+      }
+    } catch (error) {
+      // Don't fail task execution if claiming fails
+      logger.warn('[executor] Failed to claim temp uploads', {
+        error,
+        runId,
+        message: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
   }
 }

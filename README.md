@@ -31,12 +31,14 @@ PipeWeave lets you build reliable, observable workflows that are **easy to debug
 - **📝 Code-first pipelines** — Define workflows in TypeScript with full type safety and IDE support
 - **🔄 Built-in reliability** — Automatic retries, heartbeat monitoring, and dead letter queues
 - **📊 Observable by default** — Track every task execution, view logs, and monitor pipeline health
+- **📋 Input schemas** — Optional typed inputs with auto-generated UI forms and validation
 
 ## Documentation
 
 - **[Getting Started](./docs/getting-started.md)** — Complete setup guide from zero to production
 - **[Architecture](./docs/architecture.md)** — How PipeWeave works under the hood
 - **[Configuration](./docs/configuration.md)** — Environment variables and tuning options
+- **[Input Schemas](./docs/input-schemas.md)** — Define typed inputs with UI forms and validation
 - **[Examples](./docs/examples.md)** — Real-world patterns and code samples
 - **[API Reference](./SPEC.md)** — Complete API specification
 

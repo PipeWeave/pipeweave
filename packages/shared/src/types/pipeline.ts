@@ -9,6 +9,8 @@ import {
   AssetMetadataSchema,
 } from './task.js';
 import type { AssetMetadata } from './task.js';
+import { TaskInputSchemaSchema } from './input-schema.js';
+import type { TaskInputSchema } from './input-schema.js';
 
 // ============================================================================
 // Task Definition (registered with orchestrator)
@@ -203,6 +205,7 @@ export interface TaskRegistrationInfo {
   priority: number;
   idempotencyTTL?: number;
   description?: string;
+  inputSchema?: TaskInputSchema;
 }
 
 export const TaskRegistrationInfoSchema = z.object({
@@ -219,6 +222,7 @@ export const TaskRegistrationInfoSchema = z.object({
   priority: z.number(),
   idempotencyTTL: z.number().positive().optional(),
   description: z.string().optional(),
+  inputSchema: TaskInputSchemaSchema.optional(),
 });
 
 export const ServiceRegistrationSchema = z.object({

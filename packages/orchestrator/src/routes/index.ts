@@ -8,6 +8,7 @@ import { registerTaskRoutes } from './tasks.js';
 import { registerRunRoutes } from './runs.js';
 import { registerDLQRoutes } from './dlq.js';
 import { registerStorageRoutes } from './storage.js';
+import { registerUploadRoutes } from './upload.js';
 import logger from '../logger.js';
 
 // ============================================================================
@@ -30,6 +31,7 @@ export function registerRoutes(app: Express, orchestrator: Orchestrator): void {
   registerRunRoutes(app);
   registerDLQRoutes(app);
   registerStorageRoutes(app);
+  registerUploadRoutes(app);
 
   // 404 handler
   app.use((_req, res) => {
